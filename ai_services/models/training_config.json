@@ -1,0 +1,14 @@
+{
+  "trained_at": "2026-05-31T15:16:37.187417+00:00",
+  "device": "cpu",
+  "neckline_metrics": {
+    "best_val_acc": 0.6748,
+    "test_acc": 0.5856,
+    "test_loss": 0.8751856341362
+  },
+  "jewelry_metrics": {
+    "final_train_acc": 1.0
+  },
+  "neckline_weights": "C:\\Users\\DELL\\Documents\\Zarva FYP\\ai_services\\models\\neckline_mobilenetv3.pth",
+  "jewelry_weights": "C:\\Users\\DELL\\Documents\\Zarva FYP\\ai_services\\models\\jewelry_efficientnet_b0.pth"
+}

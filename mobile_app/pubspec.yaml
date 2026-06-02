@@ -1,0 +1,75 @@
+name: mobile_app
+description: "Zarva Mobile Application"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.2.2
+  http: ^1.1.0
+  google_sign_in: ^6.1.0
+  image_picker: ^1.0.7
+  intl: ^0.19.0
+  url_launcher: ^6.3.2
+  uuid: ^4.3.3
+  another_flushbar: ^1.12.30
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/google.png
+    - assets/new logo.png
+    - assets/bell.png
+    - assets/message.png
+    - assets/home.png
+    - assets/online-shopping.png
+    - assets/user.png
+    - assets/1B.png
+    - assets/1C.png
+    - assets/1E.png
+    - assets/1L.png
+    - assets/1R.png
+    - assets/2B.png
+    - assets/2C.png
+    - assets/2E.png
+    - assets/2L.png
+    - assets/2N.png
+    - assets/2R.png
+    - assets/3B.png
+    - assets/3C.png
+    - assets/3E.png
+    - assets/3R.png
+    - assets/3N.png
+    - assets/4B.png
+    - assets/4C.png
+    - assets/4E.png
+    - assets/4N.png
+    - assets/4R.png
+    - assets/5B.png
+    - assets/5C.png
+    - assets/5E.png
+    - assets/5R.png
+    - assets/6C.png
+    - assets/6E.png
+    - assets/6R.png
+    - assets/7E.png
+    - assets/7N.png
+    - assets/8E.png
+    - assets/Banner.png
+    - assets/Banner2.png
+    - assets/Banner3.png
+    - assets/Banner4.png
+    - assets/whatsapp.png

@@ -1,0 +1,944 @@
+[
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_100_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\100.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_101_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\101.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_102_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\102.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_103_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\103.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_104_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\104.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_105_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\105.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_106_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\106.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_107_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\107.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_108_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "bracelet",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\108.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_109_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\109.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_110_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\110.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_111_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\111.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_112_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\112.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_113_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\113.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_114_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\114.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_115_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\115.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_116_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\116.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_117_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\117.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_118_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\118.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_119_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\119.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_120_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\120.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_121_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\121.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_122_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\122.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_123_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\123.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_124_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\124.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_125_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "bracelet",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\125.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_126_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\126.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_127_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\127.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_128_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\128.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_129_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\129.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_130_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\130.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_131_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "bracelet",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\131.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_132_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\132.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_133_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\133.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_134_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\134.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_135_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\135.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_136_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\136.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_137_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\137.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_138_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\138.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_139_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\139.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_140_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\140.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_141_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\141.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_142_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\142.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_143_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\143.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Arabian_144_crop.jpg",
+    "style_label": "Arabian",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Arabian\\144.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Hand Afghan - Etsy_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "bracelet",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Hand Afghan - Etsy.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Nimrat Khaira_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Nimrat Khaira.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_OLD KASHMIRI NECKLACE - Vintage Lake _crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\OLD KASHMIRI NECKLACE - Vintage Lake .png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 213719_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 213719.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 214235_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 214235.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 214312_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 214312.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 214332_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 214332.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 214429_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 214429.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 214500_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 214500.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 214620_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 214620.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 214729_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 214729.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 215123_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 215123.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 215140_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 215140.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 215528_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 215528.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Screenshot 2026-05-11 215541_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Screenshot 2026-05-11 215541.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_trending kasmiri earrings_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\trending kasmiri earrings.jpg"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_trendy kashmiri earrings_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\trendy kashmiri earrings.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Kashmiri_Vintage Kashmiri Necklace_crop.jpg",
+    "style_label": "Kashmiri",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Kashmiri\\Vintage Kashmiri Necklace.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_001 _crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\001 .png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_002_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\002.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_003_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\003.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_004_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\004.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_005_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\005.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_006_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\006.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_007_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "bracelet",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\007.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_008_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\008.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_009_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\009.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_010_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\010.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_011_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\011.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_013_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\013.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_014_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\014.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_015_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\015.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_016_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\016.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_017_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\017.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_018_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\018.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_019_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\019.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_020_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\020.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_021_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\021.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_022_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\022.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_023_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\023.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_024_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\024.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_025_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\025.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_026_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\026.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_027_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\027.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_028_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\028.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_029_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\029.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_030_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\030.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_031_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\031.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_032_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\032.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_033_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\033.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_034_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\034.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_035_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\035.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_036_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "bracelet",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\036.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_037_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\037.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_038_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\038.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_039_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\039.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_040_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\040.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_041_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\041.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_042_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\042.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_043_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\043.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_044_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\044.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_045_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\045.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_046_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\046.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_047_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\047.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_048_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\048.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_049_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\049.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_050_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\050.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_051_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\051.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_052_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\052.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_053_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\053.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_054_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\054.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_055_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\055.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_056_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\056.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_057_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\057.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_058_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\058.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_059_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\059.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_060_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\060.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_061_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\061.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_062_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\062.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_063_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\063.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_064_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\064.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_065_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\065.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_066_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\066.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_067_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\067.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_068_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\068.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_069_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\069.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_070_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\070.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_071_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\071.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_072_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\072.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_073_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\073.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_074_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\074.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_075_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\075.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_076_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\076.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_077_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\077.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_078_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\078.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_079_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\079.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_080_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\080.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_081_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\081.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_082_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "bracelet",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\082.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_083_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\083.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_084_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\084.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_085_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\085.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_086_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\086.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_087_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\087.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_Screenshot 2026-04-28 231448_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\Screenshot 2026-04-28 231448.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_Screenshot 2026-04-28 231542_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\Screenshot 2026-04-28 231542.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_Screenshot 2026-04-28 231600_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\Screenshot 2026-04-28 231600.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_Screenshot 2026-04-28 231704_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\Screenshot 2026-04-28 231704.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_Screenshot 2026-04-28 232123_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\Screenshot 2026-04-28 232123.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_Screenshot 2026-04-28 232148_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\Screenshot 2026-04-28 232148.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_Screenshot 2026-04-28 232241_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\Screenshot 2026-04-28 232241.png"
+  },
+  {
+    "crop_path": "models\\jewelry_crops\\Mughal_Screenshot 2026-04-28 232302_crop.jpg",
+    "style_label": "Mughal",
+    "item_type": "necklace",
+    "source_image": "Images\\Jewelry\\Style\\Mughal\\Screenshot 2026-04-28 232302.png"
+  }
+]

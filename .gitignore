@@ -1,0 +1,28 @@
+# Node dependencies
+node_modules/
+.pnpm-store/
+
+# Python / IDE virtual environments and caches
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.vscode/
+
+# CRITICAL: Ignore the massive raw dataset images folder completely
+ai_services/Images/
+
+# Large AI Model Weights & Cache Files
+ai_services/yolov8s-world.pt
+ai_services/models/*.pth
+ai_services/models/jewelry_crops/
+
+# Flutter / Dart compilation files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+
+# Local Environment Credentials
+.env
