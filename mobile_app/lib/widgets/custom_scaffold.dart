@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/auth_helper.dart';
 
 class CustomScaffold extends StatelessWidget {
   final Widget body;
@@ -22,8 +23,17 @@ class CustomScaffold extends StatelessWidget {
     this.forceShowBack = false,
   });
 
-  void _onBottomNavTap(BuildContext context, int index) {
+  void _onBottomNavTap(BuildContext context, int index) async {
     if (index == currentIndex) return;
+
+    if (index == 1 || index == 3) {
+      if (!await AuthHelper.isAuthenticated()) {
+        if (context.mounted) {
+          AuthHelper.showLoginRedirect(context);
+        }
+        return;
+      }
+    }
 
     String route = '/home';
     switch (index) {
@@ -43,7 +53,9 @@ class CustomScaffold extends StatelessWidget {
         route = '/account';
         break;
     }
-    Navigator.pushReplacementNamed(context, route);
+    if (context.mounted) {
+      Navigator.pushReplacementNamed(context, route);
+    }
   }
 
   @override

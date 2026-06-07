@@ -1,5 +1,30 @@
 /// Sanitizes ML / API recommendation strings for luxury retail chat display.
 class ZarbotResponseFormatter {
+  /// Maps raw exceptions to customer-safe chat copy (no dart:io / stack traces).
+  static String userFriendlyError(Object error) {
+    final raw = error.toString();
+    final lower = raw.toLowerCase();
+
+    if (lower.contains('multipartfile') && lower.contains('dart:io')) {
+      return 'Photo upload on this browser failed. Please try again, or run the app '
+          'on Android/iOS for camera uploads.';
+    }
+    if (lower.contains('connection refused') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('network is unreachable')) {
+      return 'ZarBot cannot reach the styling server. Start the backend on port 5000 '
+          'and the AI service on port 8000, then try again.';
+    }
+    if (lower.contains('timeout') || lower.contains('timed out')) {
+      return 'The styling request took too long. Please try again with a smaller photo.';
+    }
+    if (lower.contains('cors')) {
+      return 'Browser blocked the request. Ensure the Node.js API allows CORS from this app.';
+    }
+
+    return 'Something went wrong while analyzing your look. Please try again in a moment.';
+  }
+
   static final List<RegExp> _mlNoisePatterns = [
     RegExp(r'Detected focal jewelry type in reference:\s*\w+\.?\s*', caseSensitive: false),
     RegExp(r'predicted_cultural_style:\s*[\w\s]+\.?\s*', caseSensitive: false),

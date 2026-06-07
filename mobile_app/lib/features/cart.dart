@@ -5,6 +5,7 @@ import '../services/promotion_service.dart';
 import '../services/wishlist_service.dart';
 import 'payment_method_screen.dart';
 import '../constants.dart';
+import '../utils/auth_helper.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -21,13 +22,27 @@ class _CartScreenState extends State<CartScreen> {
   List<dynamic> _activePromotions = [];
   Map<String, dynamic>? _appliedPromotion;
   List<Map<String, dynamic>> _wishlistItems = [];
+  bool _isAuthenticated = false;
+  bool _authChecked = false;
 
   @override
   void initState() {
     super.initState();
     _cartService.addListener(_onCartChanged);
-    _loadActivePromotions();
-    _loadWishlistItems();
+    _verifyAuthAndLoad();
+  }
+
+  Future<void> _verifyAuthAndLoad() async {
+    final authed = await AuthHelper.isAuthenticated();
+    if (!mounted) return;
+    setState(() {
+      _isAuthenticated = authed;
+      _authChecked = true;
+    });
+    if (authed) {
+      await _loadActivePromotions();
+      await _loadWishlistItems();
+    }
   }
 
   @override
@@ -50,6 +65,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _openWishlistSheet() async {
+    if (!await AuthHelper.requireAuth(context)) return;
     await _loadWishlistItems();
     if (!mounted) return;
     showModalBottomSheet(
@@ -71,7 +87,7 @@ class _CartScreenState extends State<CartScreen> {
                       final image = (p['image'] ?? '').toString();
                       final url = image.startsWith('http')
                           ? image
-                          : AppConstants.baseUrl.replaceAll('/api', '') + '/' + image;
+                          : '${AppConstants.baseUrl.replaceAll('/api', '')}/$image';
                       final productId = (p['_id'] ?? p['id'] ?? '').toString();
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -156,9 +172,64 @@ class _CartScreenState extends State<CartScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Promo applied')));
   }
 
+  Widget _buildGuestLockedBody() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_outline, size: 72, color: Color(0xFF0B1C2D)),
+            const SizedBox(height: 20),
+            const Text(
+              'Shopping Vault Locked',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0B1C2D)),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Sign up or log in to view your cart, apply promos, and complete checkout.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, color: Colors.grey),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: () => AuthHelper.showLoginRedirect(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0B1C2D),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text(
+                  'Join ZARVA / Login',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color zDarkBlue = Color(0xFF0B1C2D);
+
+    if (!_authChecked) {
+      return const CustomScaffold(
+        currentIndex: 3,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!_isAuthenticated) {
+      return CustomScaffold(
+        currentIndex: 3,
+        body: _buildGuestLockedBody(),
+      );
+    }
     
     return CustomScaffold(
       currentIndex: 3,
@@ -240,7 +311,7 @@ class _CartScreenState extends State<CartScreen> {
                      if (_activePromotions.isNotEmpty) ...[
                        const SizedBox(height: 10),
                        DropdownButtonFormField<String>(
-                         value: _appliedPromotion?['code']?.toString(),
+                         initialValue: _appliedPromotion?['code']?.toString(),
                          decoration: InputDecoration(
                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                            filled: true,
@@ -295,9 +366,10 @@ class _CartScreenState extends State<CartScreen> {
                          width: double.infinity,
                          height: 55,
                          child: ElevatedButton(
-                             onPressed: () {
+                             onPressed: () async {
                                if (_cartService.items.isEmpty) return;
-                               
+                               if (!await AuthHelper.requireAuth(context)) return;
+
                                // Convert CartItems to dynamic map for transfer
                                final cartItemsData = _cartService.items.map((item) => {
                                  'id': item.id,
@@ -381,7 +453,7 @@ class _CartScreenState extends State<CartScreen> {
                child: Image.network(
                   item.image.startsWith('http') 
                     ? item.image 
-                    : AppConstants.baseUrl.replaceAll('/api', '') + '/' + item.image,
+                    : '${AppConstants.baseUrl.replaceAll('/api', '')}/${item.image}',
                   width: 80, height: 80, fit: BoxFit.contain,
                   errorBuilder: (_,__,___) => Container(width: 80, height: 80, color: Colors.grey[200], child: const Icon(Icons.error))
                ),

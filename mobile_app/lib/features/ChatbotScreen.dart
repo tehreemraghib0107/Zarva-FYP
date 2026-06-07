@@ -56,6 +56,7 @@ class _ChatbotScreenState extends State<ChatbotScreen>
   static const List<String> _dressColors = [
     'Red',
     'Blue',
+    'Teal',
     'Pastel',
     'Gold',
     'Green',
@@ -501,17 +502,17 @@ class _ChatbotScreenState extends State<ChatbotScreen>
       _handleApiResult(result);
     } catch (e) {
       if (!mounted) return;
+      final friendly = ZarbotResponseFormatter.userFriendlyError(e);
       setState(() {
         _messages.removeWhere((m) => m['sender'] == 'typing');
         _isAnalyzing = false;
         _messages.add({
           'sender': 'bot',
           'type': 'text',
-          'text':
-              'Connection error. Ensure Node.js (:5000) and the AI engine (:8000) are running.\n\n$e',
+          'text': friendly,
         });
       });
-      _showFlush('Network error: $e');
+      _showFlush(friendly);
     }
 
     _scrollToBottom();

@@ -85,7 +85,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               final imageUrl = (imageRaw != null && imageRaw.isNotEmpty)
                   ? (imageRaw.startsWith('http')
                       ? imageRaw
-                      : AppConstants.baseUrl.replaceAll('/api', '') + '/' + imageRaw)
+                      : '${AppConstants.baseUrl.replaceAll('/api', '')}/$imageRaw')
                   : null;
 
               IconData icon = Icons.notifications;

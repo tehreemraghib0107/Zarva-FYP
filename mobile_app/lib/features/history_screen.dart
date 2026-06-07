@@ -17,7 +17,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _historyFuture = _orderService.getOrderHistory();
+    _loadHistory();
+  }
+
+  void _loadHistory() {
+    setState(() {
+      _historyFuture = _orderService.getOrderHistory();
+    });
+  }
+
+  bool _canCancelOrder(Map<String, dynamic> order) {
+    final paymentStatus = (order['paymentStatus'] ?? '').toString().toLowerCase();
+    final status = (order['status'] ?? '').toString().toLowerCase();
+    if (status == 'cancelled') return false;
+    return paymentStatus != 'paid';
+  }
+
+  Future<void> _cancelOrder(String orderId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel order?'),
+        content: const Text('This will cancel your order and restore item stock. This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Order')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel Order')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final result = await _orderService.cancelOrder(orderId);
+    if (!mounted) return;
+    if (result['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order cancelled successfully')),
+      );
+      _loadHistory();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['message']?.toString() ?? 'Could not cancel order')),
+      );
+    }
   }
 
   @override
@@ -83,12 +124,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
+                            color: (order['status'] == 'Cancelled'
+                                    ? Colors.red
+                                    : Colors.green)
+                                .withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             order['status'],
-                            style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: order['status'] == 'Cancelled' ? Colors.red : Colors.green,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -121,6 +169,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                       ],
                     ),
+                    if ((order['paymentStatus'] ?? '').toString().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Payment: ${order['paymentStatus']}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                    if (_canCancelOrder(order)) ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => _cancelOrder(order['_id'].toString()),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.redAccent),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text(
+                            'Cancel Order',
+                            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/product_service.dart';
+import '../services/favorites_state.dart';
+import '../utils/product_id_helper.dart';
 import '../widgets/custom_scaffold.dart';
 import '../constants.dart';
 import 'product_details_screen.dart';
@@ -29,7 +31,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Future<void> _removeFavorite(String productId) async {
     await _productService.toggleFavorite(productId);
-    _refreshFavorites(); // Reload list
+    await FavoritesState().refresh();
+    _refreshFavorites();
   }
 
   @override
@@ -84,7 +87,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     child: Image.network(
                      (product['image'] ?? '').toString().startsWith('http')
                        ? product['image']
-                       : AppConstants.baseUrl.replaceAll('/api', '') + '/' + (product['image'] ?? 'assets/new logo.png').toString(),
+                       : '${AppConstants.baseUrl.replaceAll('/api', '')}/${product['image'] ?? 'assets/new logo.png'}',
                      width: 60, height: 60, fit: BoxFit.cover,
                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
                     ),
@@ -93,7 +96,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   subtitle: Text(product['price'] ?? '', style: const TextStyle(color: Colors.black54)),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline, color: zDarkBlue, size: 28), 
-                    onPressed: () => _removeFavorite(product['_id']),
+                    onPressed: () => _removeFavorite(normalizeProductId(product['_id'] ?? product['id']) ?? ''),
                   ),
                 ),
               );

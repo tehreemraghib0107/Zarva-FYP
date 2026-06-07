@@ -11,7 +11,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 // Serve static assets from the mobile_app directory
-const mobileAppPath = "c:\\Users\\DELL\\Documents\\Zarva FYP\\mobile_app";
+const mobileAppPath = path.join(__dirname, '..', 'mobile_app');
 app.use('/assets', express.static(path.join(mobileAppPath, 'assets')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

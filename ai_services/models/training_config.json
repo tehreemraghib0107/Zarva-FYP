@@ -1,14 +1,52 @@
 {
-  "trained_at": "2026-05-31T15:16:37.187417+00:00",
+  "trained_at": "2026-06-07T10:02:13.180269+00:00",
   "device": "cpu",
   "neckline_metrics": {
-    "best_val_acc": 0.6748,
-    "test_acc": 0.5856,
-    "test_loss": 0.8751856341362
+    "best_val_acc": 0.0,
+    "test_acc": 1.0,
+    "test_loss": 1.5404895544052124
   },
   "jewelry_metrics": {
-    "final_train_acc": 1.0
+    "final_train_acc": 0.3885350318471338
   },
-  "neckline_weights": "C:\\Users\\DELL\\Documents\\Zarva FYP\\ai_services\\models\\neckline_mobilenetv3.pth",
-  "jewelry_weights": "C:\\Users\\DELL\\Documents\\Zarva FYP\\ai_services\\models\\jewelry_efficientnet_b0.pth"
+  "neckline_weights": "E:\\Zarva FYP\\ai_services\\models\\neckline_mobilenetv3.pth",
+  "jewelry_weights": "E:\\Zarva FYP\\ai_services\\models\\jewelry_efficientnet_b0.pth",
+  "recommendation_rules": {
+    "Round and Scoop Neck": {
+      "jewelry_match": "Choker Necklace",
+      "rationale": "Accentuates wide open collarbone framing."
+    },
+    "Boat Neck": {
+      "jewelry_match": "Choker Necklace",
+      "rationale": "Accentuates wide open collarbone framing."
+    },
+    "Square Neck": {
+      "jewelry_match": "Choker Necklace",
+      "rationale": "Accentuates wide open collarbone framing."
+    },
+    "V-Neck": {
+      "jewelry_match": "Locket",
+      "rationale": "Harmonizes with downward, plunging vertical geometry."
+    },
+    "Sweetheart Neck": {
+      "jewelry_match": "Locket",
+      "rationale": "Harmonizes with downward, plunging vertical geometry."
+    },
+    "Key-Hole Neck": {
+      "jewelry_match": "Locket",
+      "rationale": "Harmonizes with downward, plunging vertical geometry."
+    },
+    "Collar Ban": {
+      "jewelry_match": "Statement Earrings Only",
+      "rationale": "High-coverage or complex overlapping structures crowd the neck; statement earrings prevent visual clutter."
+    },
+    "Simple Collar": {
+      "jewelry_match": "Statement Earrings Only",
+      "rationale": "High-coverage or complex overlapping structures crowd the neck; statement earrings prevent visual clutter."
+    },
+    "Angrakha Neck": {
+      "jewelry_match": "Statement Earrings Only",
+      "rationale": "High-coverage or complex overlapping structures crowd the neck; statement earrings prevent visual clutter."
+    }
+  }
 }

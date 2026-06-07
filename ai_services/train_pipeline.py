@@ -3,9 +3,9 @@
 ZARVA AI Services — End-to-end training, inference, and FastAPI production engine.
 
 Stages:
-  1. IndoFashion neckline classification (MobileNetV3 + neck crop heuristic)
+  1. Custom 9-class South Asian neckline classification (YOLO-World crop + MobileNetV3)
   2. YOLO-World jewelry detection + EfficientNet-B0 regional style classifier
-  3. Expert styling matrix → recommendation payload
+  3. Skin tone + expert styling matrix → recommendation payload
   4. MongoDB Atlas chat persistence
   5. FastAPI POST /api/ai/recommend
 """
@@ -16,6 +16,7 @@ import argparse
 import json
 import logging
 import os
+import random
 import sys
 import uuid
 from collections import defaultdict
@@ -60,27 +61,18 @@ except ImportError:
 AI_ROOT = Path(__file__).resolve().parent
 NECKLINES_ROOT = AI_ROOT / "Images" / "Necklines"
 JEWELRY_STYLE_ROOT = AI_ROOT / "Images" / "Jewelry" / "Style"
+SKIN_TONE_ROOT = AI_ROOT / "Images" / "skin tone classification data"
 MODELS_DIR = AI_ROOT / "models"
 
-NECKLINE_JSON_FILES = {
-    "train": NECKLINES_ROOT / "train_data.json",
-    "val": NECKLINES_ROOT / "val_data.json",
-    "test": NECKLINES_ROOT / "test_data.json",
-}
-
-TARGET_GARMENT_CLASSES = [
-    "women_kurta",
-    "saree",
-    "gowns",
-    "blouse",
-    "lehenga",
-]
-
 NECKLINE_CLASSES = [
+    "Angrakha Neck",
     "Boat Neck",
-    "Collar/Ban",
-    "Round",
-    "Sweetheart",
+    "Collar Ban",
+    "Key-Hole Neck",
+    "Round and Scoop Neck",
+    "Simple Collar",
+    "Square Neck",
+    "Sweetheart Neck",
     "V-Neck",
 ]
 
@@ -92,19 +84,37 @@ JEWELRY_STYLE_CLASSES = [
     "Turkish",
 ]
 
-YOLO_ITEM_CLASSES = ["necklace", "earring", "bracelet"]
+SKIN_TONE_CLASSES = [
+    "dark brown",
+    "Olive",
+    "White",
+]
 
-STYLING_RULES: Dict[str, str] = {
-    "Collar/Ban": "earring",
-    "V-Neck": "necklace",
-    "Sweetheart": "necklace",
-    "Boat Neck": "necklace",
-    "Round": "necklace",
+# Maps trained folder labels → Flutter chatbot filter labels
+SKIN_TONE_DISPLAY_MAP: Dict[str, str] = {
+    "dark brown": "Deep",
+    "Olive": "Olive",
+    "White": "Neutral",
 }
 
-NECKLINE_MODEL_PATH = MODELS_DIR / "neckline_mobilenetv3.pth"
+YOLO_ITEM_CLASSES = ["necklace", "earring", "bracelet"]
+
+YOLO_NECKLINE_VOCAB = ["neckline", "collarbone region"]
+
+CHOKER_NECKLINES = frozenset({"Square Neck", "Round and Scoop Neck", "Boat Neck"})
+PENDANT_NECKLINES = frozenset({"V-Neck", "Sweetheart Neck", "Key-Hole Neck"})
+EARRINGS_ONLY_NECKLINES = frozenset({"Collar Ban", "Simple Collar", "Angrakha Neck"})
+
+WARM_DRESS_COLORS = frozenset({"Gold", "Maroon", "Red", "Ivory"})
+COOL_DRESS_COLORS = frozenset({"Blue", "Teal", "Green", "Pastel"})
+WARM_SKIN_TONES = frozenset({"Olive", "Warm", "Deep"})
+
+DEFAULT_NECKLINE_CLASS = "Round and Scoop Neck"
+DEFAULT_NECKLINE_INDEX = NECKLINE_CLASSES.index(DEFAULT_NECKLINE_CLASS)
+
+NECKLINE_MODEL_PATH = MODELS_DIR / "neckline_9class_model.pth"
 JEWELRY_MODEL_PATH = MODELS_DIR / "jewelry_efficientnet_b0.pth"
-PSEUDO_LABELS_PATH = MODELS_DIR / "neckline_pseudo_labels.json"
+SKIN_TONE_MODEL_PATH = MODELS_DIR / "skin_tone_mobilenetv3.pth"
 JEWELRY_CACHE_PATH = MODELS_DIR / "jewelry_yolo_crops.json"
 TRAINING_CONFIG_PATH = MODELS_DIR / "training_config.json"
 
@@ -137,19 +147,7 @@ def _load_env() -> None:
 # ---------------------------------------------------------------------------
 
 
-def crop_neck_region(bgr: np.ndarray) -> np.ndarray:
-    """
-    Isolate the upper-torso neckline band: skip generic head clearance (~8%),
-    then capture the next ~22% vertical slice (≈20–25% garment zone).
-    """
-    if bgr is None or bgr.size == 0:
-        raise ValueError("Empty image passed to crop_neck_region")
-    h, w = bgr.shape[:2]
-    head_clearance = max(1, int(h * 0.08))
-    neck_band_height = max(1, int(h * 0.22))
-    y0 = head_clearance
-    y1 = min(h, y0 + neck_band_height)
-    return bgr[y0:y1, 0:w]
+# crop_neck_region function removed to prioritize dynamic YOLO-World bounding-box strategy.
 
 
 def bgr_to_rgb_tensor(bgr: np.ndarray, transform: transforms.Compose) -> torch.Tensor:
@@ -161,6 +159,7 @@ def bgr_to_rgb_tensor(bgr: np.ndarray, transform: transforms.Compose) -> torch.T
 PALETTE_RGB_ANCHORS: Dict[str, Tuple[int, int, int]] = {
     "Red": (180, 40, 50),
     "Blue": (45, 70, 160),
+    "Teal": (35, 130, 125),
     "Pastel": (210, 190, 220),
     "Gold": (200, 170, 80),
     "Green": (50, 120, 70),
@@ -169,41 +168,197 @@ PALETTE_RGB_ANCHORS: Dict[str, Tuple[int, int, int]] = {
 }
 
 MANUAL_NECKLINE_MAP: Dict[str, str] = {
-    "round / scoop": "Round",
-    "round": "Round",
-    "v-neck": "V-Neck",
+    "round / scoop": "Round and Scoop Neck",
+    "round": "Round and Scoop Neck",
+    "scoop": "Round and Scoop Neck",
     "boat neck": "Boat Neck",
-    "collar / ban": "Collar/Ban",
-    "collar/ban": "Collar/Ban",
-    "sweetheart": "Sweetheart",
+    "v-neck": "V-Neck",
+    "v neck": "V-Neck",
+    "key-hole": "Key-Hole Neck",
+    "key hole": "Key-Hole Neck",
+    "sweetheart": "Sweetheart Neck",
+    "collar ban": "Collar Ban",
+    "collar / ban": "Collar Ban",
+    "collar/ban": "Collar Ban",
+    "simple collar": "Simple Collar",
+    "square neck": "Square Neck",
+    "angrakha": "Angrakha Neck",
 }
 
 
-def extract_dominant_dress_color(bgr: np.ndarray) -> str:
-    """K-Means dominant garment colour when the client sends an empty dressColor."""
+def _rgb_to_palette_name(rgb: Tuple[int, int, int]) -> str:
+    best_name = "Gold"
+    best_dist = float("inf")
+    for name, anchor in PALETTE_RGB_ANCHORS.items():
+        dist = sum((rgb[i] - anchor[i]) ** 2 for i in range(3))
+        if dist < best_dist:
+            best_dist = dist
+            best_name = name
+    return best_name
+
+
+def _is_gold_accent_rgb(rgb: Tuple[int, int, int]) -> bool:
+    """Detect mustard/gold embroidery pixels in multi-tone South Asian prints."""
+    r, g, b = rgb
+    return r > 150 and g > 110 and b < 120 and (r - b) > 40
+
+
+def extract_dress_color_profile(bgr: np.ndarray) -> Tuple[str, bool, str]:
+    """
+    K-Means on YOLO neck crop — returns (palette_name, has_warm_accents, display_label).
+    Handles teal/navy bases with gold block-print accents.
+    """
+    if bgr is None or bgr.size == 0:
+        return "Gold", True, "Gold"
     small = cv2.resize(bgr, (128, 128))
     pixels = small.reshape(-1, 3).astype(np.float32)
-    if len(pixels) < 3:
-        return "Gold"
+    if len(pixels) < 4:
+        return "Gold", True, "Gold"
+    k = 4
     _compactness, labels, centers = cv2.kmeans(
         pixels,
-        3,
+        k,
         None,
         (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 24, 1.0),
         8,
         cv2.KMEANS_PP_CENTERS,
     )
-    counts = np.bincount(labels.flatten(), minlength=3)
-    dominant_bgr = centers[int(np.argmax(counts))]
-    dominant_rgb = (int(dominant_bgr[2]), int(dominant_bgr[1]), int(dominant_bgr[0]))
-    best_name = "Gold"
-    best_dist = float("inf")
-    for name, rgb in PALETTE_RGB_ANCHORS.items():
-        dist = sum((dominant_rgb[i] - rgb[i]) ** 2 for i in range(3))
-        if dist < best_dist:
-            best_dist = dist
-            best_name = name
-    return best_name
+    counts = np.bincount(labels.flatten(), minlength=k)
+    ranked = sorted(range(k), key=lambda i: counts[i], reverse=True)
+
+    cluster_names: List[str] = []
+    cluster_rgbs: List[Tuple[int, int, int]] = []
+    for idx in ranked:
+        bgr_c = centers[idx]
+        rgb = (int(bgr_c[2]), int(bgr_c[1]), int(bgr_c[0]))
+        cluster_rgbs.append(rgb)
+        cluster_names.append(_rgb_to_palette_name(rgb))
+
+    dominant = cluster_names[0]
+    has_gold_accent = any(_is_gold_accent_rgb(rgb) for rgb in cluster_rgbs[1:])
+    has_warm_accent = has_gold_accent or any(n in WARM_DRESS_COLORS for n in cluster_names[1:])
+
+    if dominant in ("Teal", "Blue", "Green") and has_gold_accent:
+        display = f"{dominant} with Gold"
+        has_warm_accent = True
+    elif dominant in WARM_DRESS_COLORS:
+        display = dominant
+        has_warm_accent = True
+    else:
+        display = dominant
+
+    return dominant, has_warm_accent, display
+
+
+def extract_dominant_dress_color(bgr: np.ndarray) -> str:
+    """Backward-compatible wrapper — returns human-readable dress colour label."""
+    _dominant, _warm, display = extract_dress_color_profile(bgr)
+    return display
+
+
+def normalize_neckline_label(neckline: str) -> str:
+    """Map any prediction/manual string to one of the 9 canonical folder class names."""
+    cleaned = neckline.strip()
+    if not cleaned:
+        return DEFAULT_NECKLINE_CLASS
+    resolved = resolve_manual_neckline(cleaned)
+    if resolved is not None:
+        return resolved
+    for label in NECKLINE_CLASSES:
+        if label.lower() == cleaned.lower():
+            return label
+    return DEFAULT_NECKLINE_CLASS
+
+
+def is_warm_metal_palette(skin_tone: str, dress_color: str, dress_has_warm_accents: bool = False) -> bool:
+    tone = skin_tone.strip()
+    color_lower = dress_color.lower()
+    if tone in WARM_SKIN_TONES:
+        return True
+    if dress_has_warm_accents:
+        return True
+    if any(w in color_lower for w in ("gold", "maroon", "mustard", "warm")):
+        return True
+    for warm in WARM_DRESS_COLORS:
+        if warm.lower() in color_lower:
+            return True
+    return False
+
+
+def build_tri_factor_recommendation(
+    neckline: str,
+    dress_color: str,
+    skin_tone: str,
+    user_query: str = "",
+    dress_has_warm_accents: bool = False,
+    color_auto_detected: bool = False,
+    skin_tone_auto_detected: bool = False,
+) -> Dict[str, str]:
+    """
+    Tri-Factor Fusion Matrix: neckline geometry × dress colour × skin tone → jewelry advice.
+    """
+    neckline_tag = normalize_neckline_label(neckline)
+    skin_tone = skin_tone.strip() or "Neutral"
+    dress_color = dress_color.strip() or "Gold"
+
+    if is_warm_metal_palette(skin_tone, dress_color, dress_has_warm_accents):
+        metal_type = "Antique Gold"
+        heritage_style = (
+            "Mughal Heritage Style Jewelry (combining classic subcontinental bridal geometry "
+            "and traditional Kundan elements)"
+        )
+    else:
+        metal_type = "Silver / White Gold / Diamond"
+        heritage_style = "Contemporary Classic Heritage"
+
+    if neckline_tag in CHOKER_NECKLINES:
+        jewelry_type = f"a stunning {metal_type} Choker Necklace"
+        jewelry_tag = f"{metal_type} Choker Necklace"
+        why_this_works = (
+            f"These wide open horizontal silhouettes leave a gorgeous negative space across the collarbones. "
+            f"A high-sitting choker in {metal_type} perfectly frames your bare skin without dipping awkwardly below the fabric line."
+        )
+    elif neckline_tag in PENDANT_NECKLINES:
+        jewelry_type = f"a refined {metal_type} Locket / Pendant Necklace"
+        jewelry_tag = f"{metal_type} Locket / Pendant Necklace"
+        why_this_works = (
+            "These necklines plunge downward vertically, creating an elongated triangular chest space. "
+            "A dangling pendant mimics this linear symmetry perfectly, creating a highly balanced, elongated profile."
+        )
+    else:
+        jewelry_type = f"bold {metal_type} Statement Earrings Only (Omit the necklace)"
+        jewelry_tag = f"{metal_type} Statement Earrings Only"
+        why_this_works = (
+            "High collars, band overlaps, and heavy embroidery structures crowd the upper throat. "
+            "Adding a necklace introduces unnecessary visual friction. Omitting it completely and scaling up "
+            "your face-framing earrings creates an elegant, intentional look."
+        )
+
+    if color_auto_detected:
+        color_phrase = f"detected {dress_color} garment tones from the neckline crop"
+    else:
+        color_phrase = f"{dress_color} outfit"
+    if skin_tone_auto_detected:
+        tone_phrase = f"auto-detected {skin_tone} skin tone"
+    else:
+        tone_phrase = f"{skin_tone} skin tone"
+
+    styling_insight = (
+        f"For your {color_phrase} on {tone_phrase} with a {neckline_tag} neckline, "
+        f"we recommend {jewelry_type} in our {heritage_style}. {why_this_works}"
+    )
+    if user_query.strip():
+        styling_insight += f" You asked: \"{user_query.strip()}\" — this pairing respects that brief."
+
+    return {
+        "neckline_tag": neckline_tag,
+        "jewelry_tag": jewelry_tag,
+        "metal_type": metal_type,
+        "heritage_style": heritage_style,
+        "styling_insight": styling_insight,
+        "why_this_works": why_this_works,
+        "reply": styling_insight,
+    }
 
 
 def resolve_manual_neckline(manual: str) -> Optional[str]:
@@ -220,7 +375,7 @@ def resolve_manual_neckline(manual: str) -> Optional[str]:
 
 def fashion_text_reply(user_query: str) -> Dict[str, str]:
     """Lightweight text-only stylist replies when no outfit image is supplied."""
-    q = user_query.strip().lower()
+    q = user_query.strip()
     if not q:
         return {
             "reply": (
@@ -228,30 +383,82 @@ def fashion_text_reply(user_query: str) -> Dict[str, str]:
                 "or attach an outfit photo for a full AI styling pass."
             ),
             "whyThisWorks": "Open prompts help us guide you toward the right styling pathway.",
+            "styling_insight": "Welcome to ZarBot. Ask me about saree draping or jewelry pairing.",
+            "why_this_works": "Open prompts help us guide you toward the right styling pathway.",
+            "neckline_tag": "",
+            "jewelry_tag": "",
         }
-    if any(w in q for w in ("saree", "sari")):
+
+    resolved_neckline = resolve_manual_neckline(q)
+    if resolved_neckline is not None:
+        fused = build_tri_factor_recommendation(
+            neckline=resolved_neckline,
+            dress_color="Gold",
+            skin_tone="Neutral",
+        )
+        return {
+            "reply": fused["reply"],
+            "stylingInsight": fused["styling_insight"],
+            "styling_insight": fused["styling_insight"],
+            "whyThisWorks": fused["why_this_works"],
+            "why_this_works": fused["why_this_works"],
+            "neckline_tag": fused["neckline_tag"],
+            "jewelry_tag": fused["jewelry_tag"],
+        }
+
+    q_lower = q.lower()
+    for label in NECKLINE_CLASSES:
+        if label.lower() in q_lower:
+            fused = build_tri_factor_recommendation(
+                neckline=label,
+                dress_color="Gold",
+                skin_tone="Neutral",
+            )
+            return {
+                "reply": fused["reply"],
+                "stylingInsight": fused["styling_insight"],
+                "styling_insight": fused["styling_insight"],
+                "whyThisWorks": fused["why_this_works"],
+                "why_this_works": fused["why_this_works"],
+                "neckline_tag": fused["neckline_tag"],
+                "jewelry_tag": fused["jewelry_tag"],
+            }
+
+    if any(w in q_lower for w in ("saree", "sari")):
         return {
             "reply": (
                 "For sarees, balance the drape with a necklace that follows your blouse neckline — "
                 "V and sweetheart necks love layered temple chains; boat necks suit collar-grazing strands."
             ),
             "whyThisWorks": "Vertical lines on the torso stay uninterrupted when jewelry echoes the neckline geometry.",
+            "styling_insight": "Match metal tone to embroidery and let the neckline guide the silhouette.",
+            "why_this_works": "Vertical lines on the torso stay uninterrupted when jewelry echoes the neckline geometry.",
+            "neckline_tag": "",
+            "jewelry_tag": "",
         }
-    if any(w in q for w in ("lehenga", "bridal", "wedding")):
+    if any(w in q_lower for w in ("lehenga", "bridal", "wedding")):
         return {
             "reply": (
                 "Bridal lehengas shine with regional statement pieces: Mughal kundan chokers, "
                 "Pashtun jhumkas, or Kashmiri delicate filigree depending on your embroidery palette."
             ),
             "whyThisWorks": "Heavy skirt volume is balanced by focal jewelry near the face and neckline.",
+            "styling_insight": "Bridal volumes work best with a single strong focal piece at the face or neckline.",
+            "why_this_works": "Heavy skirt volume is balanced by focal jewelry near the face and neckline.",
+            "neckline_tag": "",
+            "jewelry_tag": "",
         }
-    if any(w in q for w in ("kurta", "kurti", "salwar")):
+    if any(w in q_lower for w in ("kurta", "kurti", "salwar")):
         return {
             "reply": (
                 "Kurtas with collar or band necklines photograph best with earrings alone; "
                 "add a delicate necklace only if the neckline drops below the collar bone."
             ),
             "whyThisWorks": "High necklines avoid visual clutter — earrings draw the eye without competing lines.",
+            "styling_insight": "Keep the neck clean on collar styles and use earrings to frame the face.",
+            "why_this_works": "High necklines avoid visual clutter — earrings draw the eye without competing lines.",
+            "neckline_tag": "",
+            "jewelry_tag": "Statement Earrings Only",
         }
     return {
         "reply": (
@@ -259,6 +466,10 @@ def fashion_text_reply(user_query: str) -> Dict[str, str]:
             "Until then: match metal tone to embroidery, and let one statement piece anchor the look."
         ),
         "whyThisWorks": "A single focal accessory prevents competing highlights on richly embellished South Asian textiles.",
+        "styling_insight": "Until an outfit image is supplied, choose one strong piece and avoid competing accents.",
+        "why_this_works": "A single focal accessory prevents competing highlights on richly embellished South Asian textiles.",
+        "neckline_tag": "",
+        "jewelry_tag": "",
     }
 
 
@@ -267,80 +478,214 @@ def fashion_text_reply(user_query: str) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def load_json_records(json_path: Path) -> List[Dict[str, Any]]:
-    """Load line-delimited JSON objects or a standard JSON array."""
-    text = json_path.read_text(encoding="utf-8").strip()
-    if not text:
-        return []
-    if text.startswith("["):
-        data = json.loads(text)
-        return data if isinstance(data, list) else []
-    records: List[Dict[str, Any]] = []
-    for line in text.splitlines():
-        line = line.strip()
-        if line:
-            records.append(json.loads(line))
-    return records
+# JSON dataset utilities removed to prioritize direct Custom South Asian dataset folder training.
 
 
-def filter_garment_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    allowed = {c.lower() for c in TARGET_GARMENT_CLASSES}
-    filtered = []
-    for row in records:
-        label = str(row.get("class_label", "")).strip().lower()
-        if label in allowed:
-            filtered.append(row)
-    return filtered
+def neckline_class_to_idx() -> Dict[str, int]:
+    """Canonical index map — folder order must match NECKLINE_CLASSES exactly."""
+    return {name: idx for idx, name in enumerate(NECKLINE_CLASSES)}
 
 
-def resolve_image_path(relative_path: str) -> Path:
-    rel = relative_path.replace("\\", "/").lstrip("/")
-    if rel.startswith("images/"):
-        return NECKLINES_ROOT / rel
-    return NECKLINES_ROOT / "images" / rel.split("images/")[-1]
+def validate_neckline_classes(classes: List[str]) -> None:
+    if classes != NECKLINE_CLASSES:
+        raise ValueError(
+            f"Neckline class order mismatch.\n"
+            f"  Expected: {NECKLINE_CLASSES}\n"
+            f"  Got:      {classes}"
+        )
+
+
+def save_neckline_checkpoint(model: nn.Module, path: Path = NECKLINE_MODEL_PATH) -> None:
+    """Persist 9-class MobileNetV3 weights; overwrites any previous checkpoint."""
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        logger.info("Overwriting previous neckline checkpoint at %s", path)
+    torch.save(
+        {
+            "model_state": model.state_dict(),
+            "classes": NECKLINE_CLASSES,
+            "class_to_idx": neckline_class_to_idx(),
+            "arch": "mobilenet_v3_small",
+            "num_classes": len(NECKLINE_CLASSES),
+        },
+        path,
+    )
+    logger.info("Saved neckline checkpoint → %s (%d classes)", path, len(NECKLINE_CLASSES))
+
+
+def load_neckline_folder_samples(
+    root: Path,
+    allowed_labels: Optional[List[str]] = None,
+) -> List[Dict[str, str]]:
+    allowed_labels = allowed_labels or NECKLINE_CLASSES
+    class_to_idx = neckline_class_to_idx()
+    image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".jfif"}
+    samples: List[Dict[str, str]] = []
+    for label in allowed_labels:
+        if label not in class_to_idx:
+            logger.warning("Skipping unknown neckline label: %s", label)
+            continue
+        folder = root / label
+        if not folder.is_dir():
+            logger.warning("Missing neckline folder: %s", folder)
+            continue
+        for image_path in sorted(folder.iterdir()):
+            if image_path.suffix.lower() not in image_exts:
+                continue
+            samples.append(
+                {
+                    "image_path": str(image_path),
+                    "neckline_label": label,
+                    "class_index": class_to_idx[label],
+                }
+            )
+    return samples
+
+
+def split_dataset_samples(
+    samples: List[Dict[str, str]],
+    train_ratio: float = 0.8,
+    val_ratio: float = 0.1,
+    seed: int = 42,
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]]]:
+    shuffled = list(samples)
+    random.Random(seed).shuffle(shuffled)
+    total = len(shuffled)
+    train_end = int(total * train_ratio)
+    val_end = train_end + int(total * val_ratio)
+    return shuffled[:train_end], shuffled[train_end:val_end], shuffled[val_end:]
+
+
+def central_square_anchor_crop(bgr: np.ndarray) -> np.ndarray:
+    h, w = bgr.shape[:2]
+    side = min(h, w)
+    if side <= 0:
+        return bgr
+    x0 = max(0, (w - side) // 2)
+    y0 = max(0, (h - side) // 2)
+    return bgr[y0 : y0 + side, x0 : x0 + side]
+
+
+def extract_skin_tone_crop(bgr: np.ndarray) -> np.ndarray:
+    """Upper-centre face/chest band for skin-tone classification on full-length portraits."""
+    if bgr is None or bgr.size == 0:
+        raise ValueError("Empty image passed to extract_skin_tone_crop")
+    h, w = bgr.shape[:2]
+    y1, y2 = 0, max(1, int(h * 0.38))
+    x1 = max(0, int(w * 0.22))
+    x2 = min(w, int(w * 0.78))
+    crop = bgr[y1:y2, x1:x2]
+    if crop.size == 0:
+        return central_square_anchor_crop(bgr)
+    return crop
+
+
+def crop_neckline_bbox(bgr: np.ndarray, yolo_model: YOLO) -> np.ndarray:
+    if bgr is None or bgr.size == 0:
+        raise ValueError("Empty image passed to crop_neckline_bbox")
+    # Target neckline and collarbone region explicitly
+    yolo_model.set_classes(YOLO_NECKLINE_VOCAB)
+    results = yolo_model.predict(source=bgr, verbose=False, conf=0.15)
+    if results:
+        result = results[0]
+        if getattr(result, "boxes", None) is not None and len(result.boxes) > 0:
+            best_conf = -1.0
+            best_box = None
+            for box in result.boxes:
+                conf = float(box.conf[0].cpu().numpy())
+                if conf > best_conf:
+                    best_conf = conf
+                    best_box = box
+            if best_box is not None:
+                xyxy = best_box.xyxy[0].cpu().numpy().astype(int)
+                x1, y1, x2, y2 = xyxy
+                h, w = bgr.shape[:2]
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(w, x2)
+                y2 = min(h, y2)
+                pad_x = int((x2 - x1) * 0.1)
+                pad_y = int((y2 - y1) * 0.1)
+                x1 = max(0, x1 - pad_x)
+                y1 = max(0, y1 - pad_y)
+                x2 = min(w, x2 + pad_x)
+                y2 = min(h, y2 + pad_y)
+                crop = bgr[y1:y2, x1:x2]
+                if crop.size > 0:
+                    return crop
+    return central_square_anchor_crop(bgr)
 
 
 # ---------------------------------------------------------------------------
-# STEP 1 — IndoFashion dataset & neckline classifier
+# STEP 1 — Custom 9-class South Asian neckline classifier
 # ---------------------------------------------------------------------------
 
 
-class IndoFashionDataset(Dataset):
-    """IndoFashion JSON loader with inline neck crop and neckline labels."""
+def build_neck_crop_train_transforms() -> transforms.Compose:
+    """Augmentations applied strictly on YOLO-isolated neck crops during training."""
+    return transforms.Compose(
+        [
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(degrees=15),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+            transforms.RandomResizedCrop(size=224, scale=(0.8, 1.0)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
+
+
+def build_neck_crop_eval_transforms() -> transforms.Compose:
+    """Deterministic resize for validation/test/inference neck crops."""
+    return transforms.Compose(
+        [
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
+
+
+class NecklineFolderDataset(Dataset):
+    """
+    South Asian neckline loader.
+
+    Live preprocessing per sample:
+      1. Load raw image from folder path
+      2. YOLO-World neck/collarbone bounding box (+10% pad, central-square fallback)
+      3. Apply split-specific transforms on the isolated crop only
+    """
 
     def __init__(
         self,
-        records: List[Dict[str, Any]],
+        samples: List[Dict[str, str]],
         transform: transforms.Compose,
-        label_map: Optional[Dict[str, str]] = None,
-        default_label: str = "Round",
+        yolo_model: YOLO,
     ) -> None:
-        self.records = records
+        self.samples = samples
         self.transform = transform
-        self.label_map = label_map or {}
-        self.default_label = default_label
-        self.class_to_idx = {c: i for i, c in enumerate(NECKLINE_CLASSES)}
+        self.yolo_model = yolo_model
+        self.class_to_idx = neckline_class_to_idx()
 
     def __len__(self) -> int:
-        return len(self.records)
+        return len(self.samples)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, int]:
-        row = self.records[index]
-        img_path = resolve_image_path(str(row["image_path"]))
+        row = self.samples[index]
+        img_path = Path(row["image_path"])
         bgr = cv2.imread(str(img_path))
-        if bgr is None:
+        if bgr is None or bgr.size == 0:
             bgr = np.zeros((224, 224, 3), dtype=np.uint8)
-        cropped = crop_neck_region(bgr)
-        tensor = bgr_to_rgb_tensor(cropped, self.transform)
-        rel_key = str(row["image_path"]).replace("\\", "/")
-        neckline = row.get("neckline_label") or self.label_map.get(rel_key, self.default_label)
-        if neckline not in self.class_to_idx:
-            neckline = self.default_label
-        return tensor, self.class_to_idx[neckline]
+        neck_crop = crop_neckline_bbox(bgr, self.yolo_model)
+        tensor = bgr_to_rgb_tensor(neck_crop, self.transform)
+        label = row.get("neckline_label", DEFAULT_NECKLINE_CLASS)
+        if label not in self.class_to_idx:
+            label = DEFAULT_NECKLINE_CLASS
+        return tensor, self.class_to_idx[label]
 
 
 class NecklineClassifier(nn.Module):
-    """MobileNetV3-Small transfer-learning head for 5 neckline tags."""
+    """MobileNetV3-Small transfer-learning head for 9 neckline tags."""
 
     def __init__(self, num_classes: int = len(NECKLINE_CLASSES)) -> None:
         super().__init__()
@@ -358,127 +703,30 @@ class NecklineClassifier(nn.Module):
         return self.backbone(x)
 
 
-def _build_feature_extractor() -> Tuple[nn.Module, transforms.Compose]:
-    """Frozen MobileNet trunk for pseudo-label clustering."""
-    weights = MobileNet_V3_Small_Weights.DEFAULT
-    net = models.mobilenet_v3_small(weights=weights)
-    net.classifier = nn.Identity()
-    net.eval()
-    net.to(DEVICE)
-    tfm = weights.transforms()
-    return net, tfm
-
-
-def generate_pseudo_neckline_labels(
-    records: List[Dict[str, Any]],
-    max_samples: int = 5000,
-) -> Dict[str, str]:
-    """
-    IndoFashion JSON lacks neckline annotations. Bootstrap weak labels via
-    frozen ImageNet features + KMeans(5), then name clusters by crop geometry
-    (aspect ratio & edge density) for reproducible viva-ready training signal.
-    """
-    if PSEUDO_LABELS_PATH.is_file():
-        logger.info("Loading cached pseudo neckline labels from %s", PSEUDO_LABELS_PATH)
-        return json.loads(PSEUDO_LABELS_PATH.read_text(encoding="utf-8"))
-
-    logger.info("Generating pseudo neckline labels (max_samples=%d)...", max_samples)
-    extractor, tfm = _build_feature_extractor()
-    subset = records[:max_samples]
-    features: List[np.ndarray] = []
-    meta: List[Dict[str, Any]] = []
-
-    with torch.no_grad():
-        for row in subset:
-            img_path = resolve_image_path(str(row["image_path"]))
-            bgr = cv2.imread(str(img_path))
-            if bgr is None:
-                continue
-            cropped = crop_neck_region(bgr)
-            tensor = bgr_to_rgb_tensor(cropped, tfm).unsqueeze(0).to(DEVICE)
-            feat = extractor(tensor).cpu().numpy().flatten()
-            gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
-            edges = cv2.Canny(gray, 50, 150)
-            edge_density = float(edges.mean()) / 255.0
-            h, w = cropped.shape[:2]
-            aspect = w / max(h, 1)
-            rel_key = str(row["image_path"]).replace("\\", "/")
-            features.append(feat)
-            meta.append(
-                {
-                    "image_path": rel_key,
-                    "aspect": aspect,
-                    "edge_density": edge_density,
-                }
-            )
-
-    if len(features) < 5:
-        logger.warning("Insufficient samples for KMeans; defaulting all labels to Round.")
-        return {m["image_path"]: "Round" for m in meta}
-
-    X = np.stack(features, axis=0)
-    kmeans = KMeans(n_clusters=5, random_state=42, n_init=10)
-    cluster_ids = kmeans.fit_predict(X)
-
-    cluster_stats: Dict[int, Dict[str, float]] = defaultdict(
-        lambda: {"aspect": 0.0, "edge": 0.0, "count": 0}
-    )
-    for cid, m in zip(cluster_ids, meta):
-        cluster_stats[int(cid)]["aspect"] += m["aspect"]
-        cluster_stats[int(cid)]["edge"] += m["edge_density"]
-        cluster_stats[int(cid)]["count"] += 1
-
-    for cid in cluster_stats:
-        cnt = max(cluster_stats[cid]["count"], 1)
-        cluster_stats[cid]["aspect"] /= cnt
-        cluster_stats[cid]["edge"] /= cnt
-
-    sorted_clusters = sorted(cluster_stats.keys(), key=lambda c: cluster_stats[c]["aspect"])
-    name_queue = ["V-Neck", "Sweetheart", "Round", "Boat Neck", "Collar/Ban"]
-    cluster_to_name = {
-        sorted_clusters[i]: name_queue[i] for i in range(min(5, len(sorted_clusters)))
-    }
-
-    label_map: Dict[str, str] = {}
-    for cid, m in zip(cluster_ids, meta):
-        label_map[m["image_path"]] = cluster_to_name.get(int(cid), "Round")
-
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    PSEUDO_LABELS_PATH.write_text(json.dumps(label_map, indent=2), encoding="utf-8")
-    logger.info("Saved %d pseudo neckline labels.", len(label_map))
-    return label_map
-
-
 def build_neckline_loaders(
-    label_map: Dict[str, str],
+    yolo_model: YOLO,
+    samples: Optional[List[Dict[str, str]]] = None,
     batch_size: int = BATCH_SIZE,
-    train_records: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    weights = MobileNet_V3_Small_Weights.DEFAULT
-    train_tfm = transforms.Compose(
-        [
-            transforms.Resize((224, 224)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.1),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-        ]
-    )
-    eval_tfm = weights.transforms()
+    train_tfm = build_neck_crop_train_transforms()
+    eval_tfm = build_neck_crop_eval_transforms()
+
+    if samples is None:
+        samples = load_neckline_folder_samples(NECKLINES_ROOT)
+    if not samples:
+        raise RuntimeError(f"No neckline samples found in {NECKLINES_ROOT}")
+
+    train_samples, val_samples, test_samples = split_dataset_samples(samples)
 
     loaders = []
-    for split in ("train", "val", "test"):
-        if split == "train" and train_records is not None:
-            records = train_records
-        else:
-            records = filter_garment_records(load_json_records(NECKLINE_JSON_FILES[split]))
-        ds = IndoFashionDataset(records, eval_tfm if split != "train" else train_tfm, label_map)
-        shuffle = split == "train"
+    for split, split_samples in zip(("train", "val", "test"), (train_samples, val_samples, test_samples)):
+        transform = train_tfm if split == "train" else eval_tfm
+        ds = NecklineFolderDataset(split_samples, transform, yolo_model)
         loaders.append(
             DataLoader(
                 ds,
                 batch_size=batch_size,
-                shuffle=shuffle,
+                shuffle=split == "train",
                 num_workers=0,
                 pin_memory=torch.cuda.is_available(),
             )
@@ -489,16 +737,19 @@ def build_neckline_loaders(
 def train_neckline_model(
     epochs: int = 8,
     lr: float = 1e-3,
-    max_pseudo_samples: int = 5000,
     train_limit: Optional[int] = None,
 ) -> Dict[str, float]:
-    train_records = filter_garment_records(load_json_records(NECKLINE_JSON_FILES["train"]))
+    samples = load_neckline_folder_samples(NECKLINES_ROOT)
     if train_limit is not None and train_limit > 0:
-        train_records = train_records[:train_limit]
-        logger.info("Neckline training capped to %d samples.", len(train_records))
-    label_map = generate_pseudo_neckline_labels(train_records, max_samples=max_pseudo_samples)
+        samples = samples[:train_limit]
+        logger.info("Neckline training capped to %d samples.", len(samples))
+    if not samples:
+        raise RuntimeError(f"No neckline samples found in {NECKLINES_ROOT}")
+
+    yolo_model = _init_yolo_world(YOLO_NECKLINE_VOCAB)
     train_loader, val_loader, test_loader = build_neckline_loaders(
-        label_map, train_records=train_records
+        yolo_model=yolo_model,
+        samples=samples,
     )
 
     model = NecklineClassifier().to(DEVICE)
@@ -540,19 +791,23 @@ def train_neckline_model(
         )
         if val_acc >= best_val_acc:
             best_val_acc = val_acc
-            MODELS_DIR.mkdir(parents=True, exist_ok=True)
-            torch.save(
-                {
-                    "model_state": model.state_dict(),
-                    "classes": NECKLINE_CLASSES,
-                    "arch": "mobilenet_v3_small",
-                },
-                NECKLINE_MODEL_PATH,
-            )
+            save_neckline_checkpoint(model)
 
+    save_neckline_checkpoint(model)
     test_loss, test_acc = _evaluate_classifier(model, test_loader, criterion)
-    history = {"best_val_acc": best_val_acc, "test_acc": test_acc, "test_loss": test_loss}
-    logger.info("Neckline training complete — test_acc=%.3f", test_acc)
+    history = {
+        "best_val_acc": best_val_acc,
+        "test_acc": test_acc,
+        "test_loss": test_loss,
+        "classes": NECKLINE_CLASSES,
+        "weights_path": str(NECKLINE_MODEL_PATH),
+        "sample_count": len(samples),
+    }
+    logger.info(
+        "Neckline training complete — test_acc=%.3f, weights=%s",
+        test_acc,
+        NECKLINE_MODEL_PATH,
+    )
     return history
 
 
@@ -607,9 +862,13 @@ class JewelryStyleClassifier(nn.Module):
         return self.backbone(x)
 
 
-def _init_yolo_world() -> YOLO:
-    model = YOLO("yolov8s-world.pt")
-    model.set_classes(YOLO_ITEM_CLASSES)
+def _init_yolo_world(vocabulary: Optional[List[str]] = None) -> YOLO:
+    weights = AI_ROOT / "yolov8s-world.pt"
+    if not weights.is_file():
+        weights = AI_ROOT.parent / "yolov8s-world.pt"
+    model = YOLO(str(weights))
+    if vocabulary:
+        model.set_classes(vocabulary)
     return model
 
 
@@ -665,7 +924,7 @@ def preprocess_jewelry_dataset(yolo_model: YOLO, force_refresh: bool = False) ->
 
     logger.info("Running YOLO-World preprocessing across regional jewelry folders...")
     samples: List[Dict[str, str]] = []
-    image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+    image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".jfif"}
 
     for style_name in JEWELRY_STYLE_CLASSES:
         style_dir = JEWELRY_STYLE_ROOT / style_name
@@ -807,6 +1066,204 @@ def train_jewelry_model(
 
 
 # ---------------------------------------------------------------------------
+# STEP 2b — Skin tone classifier (folder dataset, no YOLO)
+# ---------------------------------------------------------------------------
+
+
+def skin_tone_class_to_idx() -> Dict[str, int]:
+    return {name: idx for idx, name in enumerate(SKIN_TONE_CLASSES)}
+
+
+def load_skin_tone_folder_samples(
+    root: Path,
+    allowed_labels: Optional[List[str]] = None,
+) -> List[Dict[str, str]]:
+    allowed_labels = allowed_labels or SKIN_TONE_CLASSES
+    class_to_idx = skin_tone_class_to_idx()
+    image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".jfif"}
+    samples: List[Dict[str, str]] = []
+    for label in allowed_labels:
+        if label not in class_to_idx:
+            logger.warning("Skipping unknown skin tone label: %s", label)
+            continue
+        folder = root / label
+        if not folder.is_dir():
+            logger.warning("Missing skin tone folder: %s", folder)
+            continue
+        for image_path in sorted(folder.iterdir()):
+            if image_path.suffix.lower() not in image_exts:
+                continue
+            samples.append(
+                {
+                    "image_path": str(image_path),
+                    "skin_tone_label": label,
+                    "class_index": class_to_idx[label],
+                }
+            )
+    return samples
+
+
+class SkinToneFolderDataset(Dataset):
+    def __init__(
+        self,
+        samples: List[Dict[str, str]],
+        transform: transforms.Compose,
+    ) -> None:
+        self.samples = samples
+        self.transform = transform
+        self.class_to_idx = skin_tone_class_to_idx()
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, int]:
+        row = self.samples[index]
+        bgr = cv2.imread(str(row["image_path"]))
+        if bgr is None or bgr.size == 0:
+            bgr = np.zeros((224, 224, 3), dtype=np.uint8)
+        cropped = extract_skin_tone_crop(bgr)
+        tensor = bgr_to_rgb_tensor(cropped, self.transform)
+        label = row.get("skin_tone_label", SKIN_TONE_CLASSES[0])
+        if label not in self.class_to_idx:
+            label = SKIN_TONE_CLASSES[0]
+        return tensor, self.class_to_idx[label]
+
+
+class SkinToneClassifier(nn.Module):
+    """MobileNetV3-Small head for 3 skin-tone folders."""
+
+    def __init__(self, num_classes: int = len(SKIN_TONE_CLASSES)) -> None:
+        super().__init__()
+        weights = MobileNet_V3_Small_Weights.DEFAULT
+        self.backbone = models.mobilenet_v3_small(weights=weights)
+        in_features = self.backbone.classifier[0].in_features
+        self.backbone.classifier = nn.Sequential(
+            nn.Linear(in_features, 128),
+            nn.Hardswish(inplace=True),
+            nn.Dropout(p=0.2),
+            nn.Linear(128, num_classes),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.backbone(x)
+
+
+def build_skin_tone_loaders(
+    samples: Optional[List[Dict[str, str]]] = None,
+    batch_size: int = BATCH_SIZE,
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    weights = MobileNet_V3_Small_Weights.DEFAULT
+    train_tfm = transforms.Compose(
+        [
+            transforms.Resize((224, 224)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ColorJitter(brightness=0.2, contrast=0.15, saturation=0.1),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
+    eval_tfm = weights.transforms()
+
+    if samples is None:
+        samples = load_skin_tone_folder_samples(SKIN_TONE_ROOT)
+    if not samples:
+        raise RuntimeError(f"No skin tone samples found in {SKIN_TONE_ROOT}")
+
+    train_samples, val_samples, test_samples = split_dataset_samples(samples)
+    loaders = []
+    for split, split_samples in zip(("train", "val", "test"), (train_samples, val_samples, test_samples)):
+        transform = train_tfm if split == "train" else eval_tfm
+        ds = SkinToneFolderDataset(split_samples, transform)
+        loaders.append(
+            DataLoader(
+                ds,
+                batch_size=batch_size,
+                shuffle=split == "train",
+                num_workers=0,
+                pin_memory=torch.cuda.is_available(),
+            )
+        )
+    return loaders[0], loaders[1], loaders[2]
+
+
+def save_skin_tone_checkpoint(model: nn.Module, path: Path = SKIN_TONE_MODEL_PATH) -> None:
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "model_state": model.state_dict(),
+            "classes": SKIN_TONE_CLASSES,
+            "class_to_idx": skin_tone_class_to_idx(),
+            "display_map": SKIN_TONE_DISPLAY_MAP,
+            "arch": "mobilenet_v3_small",
+            "num_classes": len(SKIN_TONE_CLASSES),
+        },
+        path,
+    )
+    logger.info("Saved skin tone checkpoint → %s", path)
+
+
+def train_skin_tone_model(epochs: int = 10, lr: float = 1e-3) -> Dict[str, float]:
+    samples = load_skin_tone_folder_samples(SKIN_TONE_ROOT)
+    if not samples:
+        raise RuntimeError(f"No skin tone samples found in {SKIN_TONE_ROOT}")
+    logger.info("Skin tone dataset: %d samples across %d classes", len(samples), len(SKIN_TONE_CLASSES))
+
+    train_loader, val_loader, test_loader = build_skin_tone_loaders(samples=samples)
+    model = SkinToneClassifier().to(DEVICE)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(epochs, 1))
+
+    best_val_acc = 0.0
+    for epoch in range(1, epochs + 1):
+        model.train()
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        for images, labels in train_loader:
+            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item() * images.size(0)
+            correct += (outputs.argmax(dim=1) == labels).sum().item()
+            total += labels.size(0)
+
+        train_acc = correct / max(total, 1)
+        val_loss, val_acc = _evaluate_classifier(model, val_loader, criterion)
+        scheduler.step()
+        logger.info(
+            "Skin Tone Epoch %d/%d — train_loss=%.4f train_acc=%.3f val_loss=%.4f val_acc=%.3f",
+            epoch,
+            epochs,
+            running_loss / max(total, 1),
+            train_acc,
+            val_loss,
+            val_acc,
+        )
+        if val_acc >= best_val_acc:
+            best_val_acc = val_acc
+            save_skin_tone_checkpoint(model)
+
+    save_skin_tone_checkpoint(model)
+    test_loss, test_acc = _evaluate_classifier(model, test_loader, criterion)
+    logger.info("Skin tone training complete — test_acc=%.3f", test_acc)
+    return {
+        "best_val_acc": best_val_acc,
+        "test_acc": test_acc,
+        "test_loss": test_loss,
+        "sample_count": len(samples),
+        "weights_path": str(SKIN_TONE_MODEL_PATH),
+    }
+
+
+def format_skin_tone_label(raw_label: str) -> str:
+    return SKIN_TONE_DISPLAY_MAP.get(raw_label, raw_label.title())
+
+
+# ---------------------------------------------------------------------------
 # STEP 3 — Expert recommendation engine
 # ---------------------------------------------------------------------------
 
@@ -818,20 +1275,45 @@ class ZarvaRecommendationEngine:
         self.device = DEVICE
         self.neckline_model: Optional[NecklineClassifier] = None
         self.jewelry_model: Optional[JewelryStyleClassifier] = None
-        self.yolo_model: Optional[YOLO] = None
-        self._neckline_tfm = MobileNet_V3_Small_Weights.DEFAULT.transforms()
+        self.skin_tone_model: Optional[SkinToneClassifier] = None
+        self.neckline_yolo: Optional[YOLO] = None
+        self.jewelry_yolo: Optional[YOLO] = None
+        self._neckline_classes: List[str] = list(NECKLINE_CLASSES)
+        self._skin_tone_classes: List[str] = list(SKIN_TONE_CLASSES)
+        self._neckline_tfm = build_neck_crop_eval_transforms()
         self._jewelry_tfm = EfficientNet_B0_Weights.DEFAULT.transforms()
+        self._skin_tone_tfm = MobileNet_V3_Small_Weights.DEFAULT.transforms()
         self._load_models()
 
     def _load_models(self) -> None:
         if NECKLINE_MODEL_PATH.is_file():
-            self.neckline_model = NecklineClassifier().to(self.device)
             ckpt = torch.load(NECKLINE_MODEL_PATH, map_location=self.device, weights_only=False)
+            ckpt_classes = ckpt.get("classes", NECKLINE_CLASSES)
+            try:
+                validate_neckline_classes(ckpt_classes)
+            except ValueError as exc:
+                logger.error(
+                    "Checkpoint at %s has incompatible class labels — %s. "
+                    "Run: python train_pipeline.py --mode train-neckline",
+                    NECKLINE_MODEL_PATH,
+                    exc,
+                )
+                return
+            self._neckline_classes = ckpt_classes
+            self.neckline_model = NecklineClassifier(num_classes=len(self._neckline_classes)).to(self.device)
             self.neckline_model.load_state_dict(ckpt["model_state"])
             self.neckline_model.eval()
-            logger.info("Loaded neckline classifier from %s", NECKLINE_MODEL_PATH)
+            self._neckline_tfm = build_neck_crop_eval_transforms()
+            logger.info(
+                "Loaded 9-class neckline classifier from %s — classes: %s",
+                NECKLINE_MODEL_PATH,
+                self._neckline_classes,
+            )
         else:
-            logger.warning("Neckline weights missing — train with --mode train first.")
+            logger.warning(
+                "Neckline weights missing at %s — train with: python train_pipeline.py --mode train-neckline",
+                NECKLINE_MODEL_PATH,
+            )
 
         if JEWELRY_MODEL_PATH.is_file():
             self.jewelry_model = JewelryStyleClassifier().to(self.device)
@@ -842,23 +1324,51 @@ class ZarvaRecommendationEngine:
         else:
             logger.warning("Jewelry weights missing — train with --mode train first.")
 
-        self.yolo_model = _init_yolo_world()
+        if SKIN_TONE_MODEL_PATH.is_file():
+            ckpt = torch.load(SKIN_TONE_MODEL_PATH, map_location=self.device, weights_only=False)
+            self._skin_tone_classes = ckpt.get("classes", SKIN_TONE_CLASSES)
+            self.skin_tone_model = SkinToneClassifier(num_classes=len(self._skin_tone_classes)).to(self.device)
+            self.skin_tone_model.load_state_dict(ckpt["model_state"])
+            self.skin_tone_model.eval()
+            logger.info("Loaded skin tone classifier from %s — classes: %s", SKIN_TONE_MODEL_PATH, self._skin_tone_classes)
+        else:
+            logger.warning("Skin tone weights missing at %s — train with --mode train-skin-tone", SKIN_TONE_MODEL_PATH)
 
-    def predict_neckline(self, bgr: np.ndarray) -> str:
+        self.neckline_yolo = _init_yolo_world(YOLO_NECKLINE_VOCAB)
+        self.jewelry_yolo = _init_yolo_world(YOLO_ITEM_CLASSES)
+
+    def isolate_neck_region(self, bgr: np.ndarray) -> np.ndarray:
+        """Priority YOLO crop — neckline/collarbone box before any downstream step."""
+        if self.neckline_yolo is None:
+            self.neckline_yolo = _init_yolo_world(YOLO_NECKLINE_VOCAB)
+        return crop_neckline_bbox(bgr, self.neckline_yolo)
+
+    def predict_neckline_from_crop(self, neck_crop: np.ndarray) -> str:
+        """Classify neckline from an already YOLO-localized neck crop."""
         if self.neckline_model is None:
-            return "Round"
-        cropped = crop_neck_region(bgr)
-        tensor = bgr_to_rgb_tensor(cropped, self._neckline_tfm).unsqueeze(0).to(self.device)
+            return DEFAULT_NECKLINE_CLASS
+        tensor = bgr_to_rgb_tensor(neck_crop, self._neckline_tfm).unsqueeze(0).to(self.device)
         with torch.no_grad():
             logits = self.neckline_model(tensor)
             idx = int(logits.argmax(dim=1).item())
-        return NECKLINE_CLASSES[idx]
+        if idx < 0 or idx >= len(self._neckline_classes):
+            logger.warning(
+                "Neckline index %d out of range — defaulting to %s",
+                idx,
+                DEFAULT_NECKLINE_CLASS,
+            )
+            idx = DEFAULT_NECKLINE_INDEX
+        return self._neckline_classes[idx]
+
+    def predict_neckline(self, bgr: np.ndarray, neck_crop: Optional[np.ndarray] = None) -> str:
+        crop = neck_crop if neck_crop is not None else self.isolate_neck_region(bgr)
+        return self.predict_neckline_from_crop(crop)
 
     def predict_jewelry_style(self, bgr: np.ndarray) -> Tuple[str, str]:
         """Returns (regional_style, detected_item_type)."""
-        if self.yolo_model is None:
-            self.yolo_model = _init_yolo_world()
-        crop, item_type = _yolo_best_crop(bgr, self.yolo_model)
+        if self.jewelry_yolo is None:
+            self.jewelry_yolo = _init_yolo_world(YOLO_ITEM_CLASSES)
+        crop, item_type = _yolo_best_crop(bgr, self.jewelry_yolo)
         if self.jewelry_model is None:
             return "Mughal", item_type
         tensor = bgr_to_rgb_tensor(crop, self._jewelry_tfm).unsqueeze(0).to(self.device)
@@ -866,6 +1376,22 @@ class ZarvaRecommendationEngine:
             logits = self.jewelry_model(tensor)
             idx = int(logits.argmax(dim=1).item())
         return JEWELRY_STYLE_CLASSES[idx], item_type
+
+    def predict_skin_tone(self, bgr: np.ndarray) -> str:
+        """Predict skin tone from upper-centre crop; returns Flutter-friendly label."""
+        if self.skin_tone_model is None:
+            return "Neutral"
+        skin_crop = extract_skin_tone_crop(bgr)
+        tensor = bgr_to_rgb_tensor(skin_crop, self._skin_tone_tfm).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            logits = self.skin_tone_model(tensor)
+            idx = int(logits.argmax(dim=1).item())
+        if idx < 0 or idx >= len(self._skin_tone_classes):
+            idx = 0
+        raw_label = self._skin_tone_classes[idx]
+        display = format_skin_tone_label(raw_label)
+        logger.info("Skin tone prediction: %s → %s", raw_label, display)
+        return display
 
     def build_recommendation_payload(
         self,
@@ -876,62 +1402,47 @@ class ZarvaRecommendationEngine:
         skin_tone: str,
         user_query: str = "",
         color_auto_detected: bool = False,
+        skin_tone_auto_detected: bool = False,
+        dress_has_warm_accents: bool = False,
     ) -> Dict[str, Any]:
-        recommended_piece = STYLING_RULES.get(neckline, "necklace")
-        accent_label = "Earrings" if recommended_piece == "earring" else "Necklace"
-        if neckline in ("V-Neck", "Sweetheart"):
-            accent_label = "Statement Necklace"
-
-        if neckline == "Collar/Ban":
-            styling_insight = (
-                f"Pair refined {jewelry_style}-inspired earrings with your {neckline} silhouette — "
-                f"your {dress_color} palette stays elegant without collar-bone clutter."
-            )
-            why_this_works = (
-                "High necklines create a closed frame at the throat; earrings draw attention upward "
-                "without competing lines across the chest."
-            )
-        elif neckline in ("V-Neck", "Sweetheart"):
-            styling_insight = (
-                f"Anchor a {jewelry_style} hanging necklace or choker along your {neckline} — "
-                f"it harmonizes with {dress_color} tones and {skin_tone.lower()} undertones."
-            )
-            why_this_works = (
-                "Open necklines invite a vertical jewelry line that mirrors the décolletage and "
-                "balances shoulder width on South Asian formal wear."
-            )
-        else:
-            styling_insight = (
-                f"A classic {jewelry_style} necklace complements your {neckline} against "
-                f"{dress_color} fabric with {skin_tone.lower()} skin warmth."
-            )
-            why_this_works = (
-                "Boat and round necklines benefit from even horizontal framing — a mid-length "
-                "strand fills negative space without overwhelming embroidery."
-            )
-
-        if color_auto_detected:
-            styling_insight += " Your dress colour was refined automatically from the garment pixels."
-
-        if user_query.strip():
-            styling_insight += f" You asked: \"{user_query.strip()}\" — this pairing respects that brief."
-
-        bot_response = f"{styling_insight} {why_this_works}"
+        neckline_tag = normalize_neckline_label(neckline)
+        fused = build_tri_factor_recommendation(
+            neckline=neckline_tag,
+            dress_color=dress_color,
+            skin_tone=skin_tone,
+            user_query=user_query,
+            dress_has_warm_accents=dress_has_warm_accents,
+            color_auto_detected=color_auto_detected,
+            skin_tone_auto_detected=skin_tone_auto_detected,
+        )
+        recommended_piece = fused["jewelry_tag"]
+        why_this_works = fused["why_this_works"]
+        styling_insight = fused["styling_insight"]
+        accent_label = (
+            "Earrings" if "Earrings Only" in recommended_piece else "Necklace"
+        )
 
         return {
-            "neckline": neckline,
-            "jewelryStyle": jewelry_style,
+            "neckline": neckline_tag,
+            "neckline_tag": neckline_tag,
+            "jewelryStyle": fused["heritage_style"],
+            "jewelry_tag": recommended_piece,
+            "metalType": fused["metal_type"],
+            "heritageStyle": fused["heritage_style"],
             "recommendedJewelryType": recommended_piece,
             "recommendedAccentLabel": accent_label,
-            "culturalTheme": f"{jewelry_style} Heritage",
+            "culturalTheme": fused["heritage_style"],
             "detectedItemType": detected_item,
+            "detectedRegionalStyle": jewelry_style,
             "dressColor": dress_color,
             "skinTone": skin_tone,
             "stylingInsight": styling_insight,
+            "styling_insight": styling_insight,
             "whyThisWorks": why_this_works,
-            "stylingRulesApplied": STYLING_RULES,
-            "recommendation": bot_response,
+            "why_this_works": why_this_works,
+            "recommendation": styling_insight,
             "colorAutoDetected": color_auto_detected,
+            "skinToneAutoDetected": skin_tone_auto_detected,
         }
 
     def run_pipeline(
@@ -943,15 +1454,35 @@ class ZarvaRecommendationEngine:
         manual_neckline: str = "",
         user_query: str = "",
     ) -> Dict[str, Any]:
+        neck_crop = self.isolate_neck_region(outfit_bgr)
+        logger.info(
+            "YOLO neck crop ready — original=%dx%d, crop=%dx%d",
+            outfit_bgr.shape[1],
+            outfit_bgr.shape[0],
+            neck_crop.shape[1],
+            neck_crop.shape[0],
+        )
+
         color_auto = False
+        skin_auto = False
+        dress_warm_accents = False
         if not dress_color.strip():
-            dress_color = extract_dominant_dress_color(outfit_bgr)
+            _dominant, dress_warm_accents, dress_color = extract_dress_color_profile(neck_crop)
             color_auto = True
+            logger.info(
+                "K-Means dress colour from neck crop: %s (warm_accents=%s)",
+                dress_color,
+                dress_warm_accents,
+            )
         if not skin_tone.strip():
-            skin_tone = "Neutral"
+            skin_tone = self.predict_skin_tone(outfit_bgr)
+            skin_auto = True
 
         override = resolve_manual_neckline(manual_neckline)
-        neckline = override if override else self.predict_neckline(outfit_bgr)
+        raw_neckline = override if override else self.predict_neckline_from_crop(neck_crop)
+        neckline = normalize_neckline_label(raw_neckline)
+        if neckline != raw_neckline:
+            logger.info("Neckline normalized: %s → %s", raw_neckline, neckline)
 
         reference = jewelry_bgr if jewelry_bgr is not None else outfit_bgr
         jewelry_style, detected_item = self.predict_jewelry_style(reference)
@@ -963,6 +1494,8 @@ class ZarvaRecommendationEngine:
             skin_tone,
             user_query=user_query,
             color_auto_detected=color_auto,
+            skin_tone_auto_detected=skin_auto,
+            dress_has_warm_accents=dress_warm_accents,
         )
 
 
@@ -991,35 +1524,39 @@ def save_chat_to_db(
     Upsert user chat history in zarva_db.chats.
     Returns inserted document id string on success.
     """
-    collection = get_mongo_collection()
-    if collection is None:
+    try:
+        collection = get_mongo_collection()
+        if collection is None:
+            return None
+
+        now = datetime.now(timezone.utc)
+        entry = {
+            "role": "user",
+            "content": user_message,
+            "timestamp": now,
+        }
+        assistant_entry = {
+            "role": "assistant",
+            "content": bot_response,
+            "metadata": metadata or {},
+            "timestamp": now,
+        }
+
+        result = collection.update_one(
+            {"user_id": user_id},
+            {
+                "$push": {"messages": {"$each": [entry, assistant_entry]}},
+                "$set": {"updated_at": now},
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+        doc_id = str(result.upserted_id) if result.upserted_id else user_id
+        logger.info("Chat history saved for user_id=%s", user_id)
+        return doc_id
+    except Exception as e:
+        logger.error("Failed to save chat to database: %s", e)
         return None
-
-    now = datetime.now(timezone.utc)
-    entry = {
-        "role": "user",
-        "content": user_message,
-        "timestamp": now,
-    }
-    assistant_entry = {
-        "role": "assistant",
-        "content": bot_response,
-        "metadata": metadata or {},
-        "timestamp": now,
-    }
-
-    result = collection.update_one(
-        {"user_id": user_id},
-        {
-            "$push": {"messages": {"$each": [entry, assistant_entry]}},
-            "$set": {"updated_at": now},
-            "$setOnInsert": {"created_at": now},
-        },
-        upsert=True,
-    )
-    doc_id = str(result.upserted_id) if result.upserted_id else user_id
-    logger.info("Chat history saved for user_id=%s", user_id)
-    return doc_id
 
 
 # ---------------------------------------------------------------------------
@@ -1115,8 +1652,12 @@ def create_app() -> "FastAPI":
             "userId": userId,
             "sessionId": str(uuid.uuid4()),
             "type": "text",
-            "stylingInsight": text_payload["reply"],
-            "whyThisWorks": text_payload["whyThisWorks"],
+            "stylingInsight": text_payload["styling_insight"],
+            "styling_insight": text_payload["styling_insight"],
+            "whyThisWorks": text_payload["why_this_works"],
+            "why_this_works": text_payload["why_this_works"],
+            "neckline_tag": text_payload["neckline_tag"],
+            "jewelry_tag": text_payload["jewelry_tag"],
             "recommendation": text_payload["reply"],
         }
 
@@ -1131,17 +1672,15 @@ def create_app() -> "FastAPI":
 def run_full_training(
     neckline_epochs: int = 8,
     jewelry_epochs: int = 25,
-    max_pseudo_samples: int = 5000,
     neckline_train_limit: Optional[int] = None,
     force_yolo_refresh: bool = False,
 ) -> None:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("ZARVA training on device: %s", DEVICE)
 
-    logger.info("=== STAGE 1: IndoFashion neckline transfer learning ===")
+    logger.info("=== STAGE 1: Custom South Asian neckline transfer learning ===")
     neckline_metrics = train_neckline_model(
         epochs=neckline_epochs,
-        max_pseudo_samples=max_pseudo_samples,
         train_limit=neckline_train_limit,
     )
 
@@ -1153,13 +1692,20 @@ def run_full_training(
         force_yolo_refresh=force_yolo_refresh,
     )
 
+    logger.info("=== STAGE 3: Skin tone MobileNetV3 transfer learning ===")
+    skin_tone_metrics = train_skin_tone_model()
+
     config = {
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "device": str(DEVICE),
         "neckline_metrics": neckline_metrics,
         "jewelry_metrics": jewelry_metrics,
+        "skin_tone_metrics": skin_tone_metrics,
         "neckline_weights": str(NECKLINE_MODEL_PATH),
         "jewelry_weights": str(JEWELRY_MODEL_PATH),
+        "skin_tone_weights": str(SKIN_TONE_MODEL_PATH),
+        "recommendation_engine": "tri_factor_fusion_matrix",
+        "neckline_classes": NECKLINE_CLASSES,
     }
     TRAINING_CONFIG_PATH.write_text(json.dumps(config, indent=2), encoding="utf-8")
     logger.info("Training config written to %s", TRAINING_CONFIG_PATH)
@@ -1176,20 +1722,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ZARVA AI train & serve pipeline")
     parser.add_argument(
         "--mode",
-        choices=["train", "serve", "all"],
+        choices=["train", "train-neckline", "train-skin-tone", "serve", "all"],
         default="all",
-        help="train models, serve API, or both sequentially",
+        help="train all models, neckline only, skin tone only, serve API, or train+serve",
     )
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--neckline-epochs", type=int, default=8)
     parser.add_argument("--jewelry-epochs", type=int, default=25)
-    parser.add_argument("--max-pseudo-samples", type=int, default=5000)
+    parser.add_argument("--skin-tone-epochs", type=int, default=10)
     parser.add_argument(
         "--neckline-train-limit",
         type=int,
         default=None,
-        help="Optional cap on IndoFashion train rows (default: full filtered set)",
+        help="Optional cap on Custom South Asian train rows (default: full filtered set)",
     )
     parser.add_argument("--force-yolo-refresh", action="store_true")
     return parser.parse_args()
@@ -1199,11 +1745,21 @@ def main() -> None:
     _load_env()
     args = parse_args()
 
-    if args.mode in ("train", "all"):
+    if args.mode == "train-neckline":
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info("=== Neckline-only training (9-class custom dataset) ===")
+        train_neckline_model(
+            epochs=args.neckline_epochs,
+            train_limit=args.neckline_train_limit,
+        )
+    elif args.mode == "train-skin-tone":
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info("=== Skin tone-only training (3-class custom dataset) ===")
+        train_skin_tone_model(epochs=args.skin_tone_epochs)
+    elif args.mode in ("train", "all"):
         run_full_training(
             neckline_epochs=args.neckline_epochs,
             jewelry_epochs=args.jewelry_epochs,
-            max_pseudo_samples=args.max_pseudo_samples,
             neckline_train_limit=args.neckline_train_limit,
             force_yolo_refresh=args.force_yolo_refresh,
         )

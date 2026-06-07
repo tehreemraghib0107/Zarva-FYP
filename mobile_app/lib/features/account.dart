@@ -36,13 +36,16 @@ class _AccountMenuScreenState extends State<AccountMenuScreen> {
   @override
   Widget build(BuildContext context) {
     const Color zDarkBlue = Color(0xFF0B1C2D);
+    final bool isGuest = _userData == null || _userData!.isEmpty;
 
     return CustomScaffold(
       currentIndex: 4,
       showLogoOnly: true, 
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
+        : isGuest
+          ? _buildGuestLanding()
+          : SingleChildScrollView(
         child: Column(
           children: [
             const SizedBox(height: 20),
@@ -115,12 +118,110 @@ class _AccountMenuScreenState extends State<AccountMenuScreen> {
                 title: const Text("Log Out", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600)),
                 onTap: () async {
                    await _authService.logout();
+                   await CartService().clearGuestCart();
                    await CartService().reloadForCurrentUser();
                    if (mounted) Navigator.pushReplacementNamed(context, '/login');
                 },
               ),
             ),
             const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGuestLanding() {
+    const Color zDarkBlue = Color(0xFF0B1C2D);
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: zDarkBlue.withOpacity(0.05),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.account_circle_outlined,
+                size: 80,
+                color: zDarkBlue,
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              "Join ZARVA",
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: zDarkBlue,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Log in or sign up to access your shopping vault, track orders, edit your style profile, and save favorite jewelry items.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey.shade600,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/login').then((_) => _loadProfile());
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: zDarkBlue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  "Log In",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/signup').then((_) => _loadProfile());
+                },
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: zDarkBlue, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+                child: const Text(
+                  "Create Account",
+                  style: TextStyle(
+                    color: zDarkBlue,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),

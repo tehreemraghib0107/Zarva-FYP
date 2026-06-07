@@ -13,6 +13,7 @@ import '../features/account.dart';
 import '../features/edit_profile.dart';
 import '../features/ChatbotScreen.dart';
 import '../features/Category.dart';
+import '../widgets/auth_gate.dart'; // LoginRequiredGate
 
 final Map<String, WidgetBuilder> routes = {
   // Initial
@@ -23,12 +24,12 @@ final Map<String, WidgetBuilder> routes = {
   '/signup': (context) => const SignUpScreen(),
 
   // Home
-  '/home': (context) => const HomeScreen(),
+  '/home': (context) => const LoginRequiredGate(child: HomeScreen()),
 
   // Drawer / Bottom Nav Screens
   '/notifications': (context) => const NotificationScreen(),
-  '/cart': (context) => const CartScreen(),
-  '/account': (context) => const AccountMenuScreen(),
+  '/cart': (context) => const LoginRequiredGate(child: CartScreen()),
+  '/account': (context) => const LoginRequiredGate(child: AccountMenuScreen()),
 
   // Account
   '/edit_profile': (context) => const AccountScreen(),

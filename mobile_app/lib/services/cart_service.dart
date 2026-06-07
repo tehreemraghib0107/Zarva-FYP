@@ -68,8 +68,28 @@ class CartService with ChangeNotifier {
     _cartKey = 'cart_items_$suffix';
   }
 
-  // Load from SharedPrefs
+  Future<bool> _hasValidSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final loggedIn = prefs.getBool('isLoggedIn') ?? false;
+    return token != null && token.isNotEmpty && loggedIn;
+  }
+
+  /// Wipe guest cart storage and in-memory items (call on logout / guest splash).
+  Future<void> clearGuestCart() async {
+    _items = [];
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('cart_items_guest');
+    notifyListeners();
+  }
+
+  // Load from SharedPrefs — guests never retain a cart
   Future<void> _loadCart() async {
+    if (!await _hasValidSession()) {
+      _items = [];
+      notifyListeners();
+      return;
+    }
     await _refreshCartKey();
     final prefs = await SharedPreferences.getInstance();
     final String? cartString = prefs.getString(_cartKey);
@@ -93,6 +113,11 @@ class CartService with ChangeNotifier {
 
   /// Call this after login/logout to load the correct user's cart.
   Future<void> reloadForCurrentUser() async {
+    if (!await _hasValidSession()) {
+      _items = [];
+      notifyListeners();
+      return;
+    }
     await _loadCart();
   }
 
@@ -103,7 +128,14 @@ class CartService with ChangeNotifier {
     notifyListeners();
   }
 
-  void addToCart(Map<String, dynamic> product) {
+  Future<bool> addToCart(Map<String, dynamic> product) async {
+    await _refreshCartKey();
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null || token.isEmpty) {
+      return false;
+    }
+
     // Parse price safely
     String priceStr = product['price'].toString().replaceAll(RegExp(r'[^0-9.]'), '');
     double price = double.tryParse(priceStr) ?? 0.0;
@@ -126,26 +158,30 @@ class CartService with ChangeNotifier {
         selectedSize: selectedSize,
       ));
     }
-    _saveCart();
+    await _saveCart();
     notifyListeners();
+    return true;
   }
 
-  void removeFromCart(String id, {String selectedSize = ''}) {
+  Future<void> removeFromCart(String id, {String selectedSize = ''}) async {
+    if (!await _hasValidSession()) return;
     _items.removeWhere((item) => item.id == id && item.selectedSize == selectedSize);
-    _saveCart();
+    await _saveCart();
     notifyListeners();
   }
 
-  void incrementQuantity(String id, {String selectedSize = ''}) {
+  Future<void> incrementQuantity(String id, {String selectedSize = ''}) async {
+    if (!await _hasValidSession()) return;
     int index = _items.indexWhere((item) => item.id == id && item.selectedSize == selectedSize);
     if (index != -1) {
       _items[index].quantity++;
-      _saveCart();
+      await _saveCart();
       notifyListeners();
     }
   }
 
-  void decrementQuantity(String id, {String selectedSize = ''}) {
+  Future<void> decrementQuantity(String id, {String selectedSize = ''}) async {
+    if (!await _hasValidSession()) return;
     int index = _items.indexWhere((item) => item.id == id && item.selectedSize == selectedSize);
     if (index != -1) {
       if (_items[index].quantity > 1) {
@@ -153,7 +189,7 @@ class CartService with ChangeNotifier {
       } else {
         _items.removeAt(index);
       }
-      _saveCart();
+      await _saveCart();
       notifyListeners();
     }
   }

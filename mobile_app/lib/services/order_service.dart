@@ -81,6 +81,34 @@ class OrderService {
     }
   }
 
+  Future<Map<String, dynamic>> cancelOrder(String orderId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token == null) return {'success': false, 'message': 'Not logged in'};
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/$orderId/cancel'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'order': jsonDecode(response.body)};
+      }
+      try {
+        final data = jsonDecode(response.body);
+        return {'success': false, 'message': data['msg'] ?? 'Could not cancel order'};
+      } catch (_) {
+        return {'success': false, 'message': 'Could not cancel order'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
   Future<List<dynamic>> getOrderHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();

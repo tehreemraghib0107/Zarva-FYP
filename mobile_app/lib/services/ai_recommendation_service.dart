@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../constants.dart';
@@ -58,28 +59,32 @@ class AiRecommendationService {
     request.headers['X-Multipart-Boundary'] = boundary;
     request.headers['X-Request-Id'] = boundary;
 
-    final path = payload.imagePath.trim();
-    if (path.isNotEmpty) {
+    final bytes = payload.imageBytes;
+    if (bytes == null || bytes.isEmpty) {
+      return {
+        'success': false,
+        'message': 'No image data available for upload.',
+      };
+    }
+
+    // Web (Chrome) has no dart:io — MultipartFile.fromPath always fails there.
+    final usePath = !kIsWeb && payload.imagePath.trim().isNotEmpty;
+    if (usePath) {
       request.files.add(
         await http.MultipartFile.fromPath(
           'image',
-          path,
-          filename: payload.imageFilename,
-        ),
-      );
-    } else if (payload.imageBytes != null && payload.imageBytes!.isNotEmpty) {
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'image',
-          payload.imageBytes!,
+          payload.imagePath.trim(),
           filename: payload.imageFilename,
         ),
       );
     } else {
-      return {
-        'success': false,
-        'message': 'No image bytes available for upload.',
-      };
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          bytes,
+          filename: payload.imageFilename,
+        ),
+      );
     }
 
     return _parseResponse(

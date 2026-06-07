@@ -26,3 +26,9 @@ build/
 
 # Local Environment Credentials
 .env
+yolov8s-world.pt
+backend/uploads/
+backend/backend_test_image.png
+
+ai_services/weights/clip/
+*.pt

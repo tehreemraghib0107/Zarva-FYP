@@ -43,8 +43,31 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
               'Online Payment',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: zDarkBlue),
             ),
-            const SizedBox(height: 30),
-            
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber.shade800, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Once your order is prepaid online, it cannot be cancelled or refunded. '
+                      'Refunds are only possible if the parcel or product arrives damaged.',
+                      style: TextStyle(fontSize: 12.5, color: Colors.amber.shade900, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
             Row(
               children: [
                 _methodChip('EasyPaisa'),

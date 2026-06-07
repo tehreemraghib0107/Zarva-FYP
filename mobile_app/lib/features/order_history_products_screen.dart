@@ -94,7 +94,7 @@ class _OrderHistoryProductsScreenState extends State<OrderHistoryProductsScreen>
                     final image = (p['image'] ?? '').toString();
                     final url = image.startsWith('http')
                         ? image
-                        : AppConstants.baseUrl.replaceAll('/api', '') + '/' + image;
+                        : '${AppConstants.baseUrl.replaceAll('/api', '')}/$image';
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

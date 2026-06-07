@@ -4,6 +4,8 @@ import '../services/review_service.dart';
 import '../services/wishlist_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants.dart';
+import '../utils/auth_helper.dart';
+import 'payment_method_screen.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -58,7 +60,89 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     });
   }
 
+  bool _validateRingSize(bool isRing) {
+    if (isRing && (_selectedSize == null || _selectedSize!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select ring size')),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Map<String, dynamic> _productForCart(bool isRing) {
+    return {
+      ...widget.product,
+      'selectedSize': isRing ? _selectedSize : '',
+    };
+  }
+
+  Future<void> _handleAddToCart(bool isRing) async {
+    if (!await AuthHelper.requireAuth(context)) return;
+    if (!_validateRingSize(isRing)) return;
+
+    final added = await CartService().addToCart(_productForCart(isRing));
+    if (!added) {
+      if (!context.mounted) return;
+      AuthHelper.showLoginRedirect(context);
+      return;
+    }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Added ${widget.product['name']} to cart!'),
+        backgroundColor: const Color(0xFF0B1C2D),
+        duration: const Duration(seconds: 1),
+        action: SnackBarAction(
+          label: 'VIEW CART',
+          textColor: Colors.white,
+          onPressed: () => Navigator.pushReplacementNamed(context, '/cart'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleBuyNow(bool isRing) async {
+    if (!await AuthHelper.requireAuth(context)) return;
+    if (!_validateRingSize(isRing)) return;
+
+    final product = _productForCart(isRing);
+    final added = await CartService().addToCart(product);
+    if (!added) {
+      if (!context.mounted) return;
+      AuthHelper.showLoginRedirect(context);
+      return;
+    }
+
+    final priceStr = product['price'].toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    final price = double.tryParse(priceStr) ?? 0.0;
+    final productId = (product['_id'] ?? product['id']).toString();
+
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentMethodScreen(
+          items: [
+            {
+              'id': productId,
+              'name': product['name'],
+              'price': 'PKR ${price.toStringAsFixed(0)}',
+              'quantity': 1,
+              'size': product['selectedSize'] ?? '',
+              'image': product['image'],
+              'category': product['category'] ?? 'Jewelry',
+            },
+          ],
+          subtotal: price,
+        ),
+      ),
+    );
+  }
+
   Future<void> _toggleWishlist() async {
+    if (!await AuthHelper.requireAuth(context)) return;
     final id = _extractProductId(widget.product);
     if (id == null) return;
     final nowFav = await _wishlistService.toggle(id);
@@ -220,7 +304,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       child: Image.network(
                         (widget.product['image'] ?? '').toString().startsWith('http')
                           ? widget.product['image']
-                          : AppConstants.baseUrl.replaceAll('/api', '') + '/' + (widget.product['image'] ?? 'assets/new logo.png').toString(),
+                          : '${AppConstants.baseUrl.replaceAll('/api', '')}/${widget.product['image'] ?? 'assets/new logo.png'}',
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
@@ -404,32 +488,31 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         Expanded(
                           child: SizedBox(
                             height: 55,
-                            child: ElevatedButton.icon(
-                              onPressed: isOutOfStock ? null : () {
-                                 if (isRing && (_selectedSize == null || _selectedSize!.isEmpty)) {
-                                   ScaffoldMessenger.of(context).showSnackBar(
-                                     const SnackBar(content: Text('Please select ring size')),
-                                   );
-                                   return;
-                                 }
-                                 CartService().addToCart({
-                                   ...widget.product,
-                                   'selectedSize': isRing ? _selectedSize : '',
-                                 });
-
-                                 ScaffoldMessenger.of(context).showSnackBar(
-                                   SnackBar(
-                                     content: Text('Added ${widget.product['name']} to cart!'),
-                                     backgroundColor: zDarkBlue,
-                                     duration: const Duration(seconds: 1),
-                                     action: SnackBarAction(
-                                       label: 'VIEW CART',
-                                       textColor: Colors.white,
-                                       onPressed: () => Navigator.pushReplacementNamed(context, '/cart'),
-                                     ),
-                                   )
-                                 );
-                              },
+                            child: OutlinedButton(
+                              onPressed: isOutOfStock ? null : () => _handleAddToCart(isRing),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: isOutOfStock ? Colors.grey : zDarkBlue),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                              child: Text(
+                                isOutOfStock ? "Out of Stock" : "Add to Cart",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isOutOfStock ? Colors.grey[600] : zDarkBlue,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: SizedBox(
+                            height: 55,
+                            child: ElevatedButton(
+                              onPressed: isOutOfStock ? null : () => _handleBuyNow(isRing),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isOutOfStock ? Colors.grey : zDarkBlue,
                                 shape: RoundedRectangleBorder(
@@ -439,10 +522,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 disabledBackgroundColor: Colors.grey[300],
                                 disabledForegroundColor: Colors.grey[600],
                               ),
-                              icon: Icon(isOutOfStock ? Icons.remove_shopping_cart : Icons.shopping_bag_outlined, color: isOutOfStock ? Colors.grey[600] : Colors.white),
-                              label: Text(
-                                isOutOfStock ? "Out of Stock" : "Add to cart",
-                                style: TextStyle(fontSize: 18, color: isOutOfStock ? Colors.grey[600] : Colors.white, fontWeight: FontWeight.bold),
+                              child: Text(
+                                isOutOfStock ? "Unavailable" : "Buy Now",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isOutOfStock ? Colors.grey[600] : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),

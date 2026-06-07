@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/cart_service.dart';
+import '../utils/auth_helper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,16 +17,15 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void checkLogin() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    final isLoggedIn = token != null && token.isNotEmpty;
+    final authed = await AuthHelper.isAuthenticated();
 
     if (!mounted) return;
 
-    if (isLoggedIn) {
+    if (authed) {
       await CartService().reloadForCurrentUser();
       Navigator.pushReplacementNamed(context, '/home');
     } else {
+      await CartService().clearGuestCart();
       Navigator.pushReplacementNamed(context, '/login');
     }
   }

@@ -175,6 +175,38 @@ router.get('/', async (req, res) => {
     }
 });
 
+// @route   PUT /orders/:id/cancel (Mobile — only non-prepaid orders)
+router.put('/:id/cancel', auth, async (req, res) => {
+    try {
+        const order = await Order.findOne({ _id: req.params.id, userId: req.user.id });
+        if (!order) return res.status(404).json({ msg: 'Order not found' });
+
+        if (String(order.paymentStatus).toLowerCase() === 'paid') {
+            return res.status(400).json({ msg: 'Prepaid orders cannot be cancelled or refunded unless the parcel arrives damaged.' });
+        }
+        if (String(order.status).toLowerCase() === 'cancelled') {
+            return res.status(400).json({ msg: 'Order is already cancelled' });
+        }
+
+        const rollbackOps = (order.items || []).map((item) => ({
+            updateOne: {
+                filter: { productId: item.productId },
+                update: { $inc: { sold: -(item.quantity || 1) } },
+            },
+        }));
+        if (rollbackOps.length > 0) {
+            await Inventory.bulkWrite(rollbackOps);
+        }
+
+        order.status = 'Cancelled';
+        await order.save();
+        res.json(order);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ msg: err.message || 'Server Error' });
+    }
+});
+
 // GET a single order (For Admin invoice/details)
 router.get('/:id', async (req, res) => {
     try {

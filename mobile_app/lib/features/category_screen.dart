@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../services/product_service.dart';
 import '../widgets/custom_scaffold.dart';
 import '../constants.dart';
+import '../utils/auth_helper.dart';
+import '../utils/product_id_helper.dart';
+import '../services/favorites_state.dart';
+import '../config/route_observer.dart';
 
 class CategoryScreen extends StatefulWidget {
   final String? initialCategory;
@@ -11,21 +15,38 @@ class CategoryScreen extends StatefulWidget {
   State<CategoryScreen> createState() => _CategoryScreenState();
 }
 
-class _CategoryScreenState extends State<CategoryScreen> {
+class _CategoryScreenState extends State<CategoryScreen> with RouteAware {
   final ProductService _productService = ProductService();
+  final FavoritesState _favoritesState = FavoritesState();
   late Future<List<dynamic>> _productsFuture;
   final TextEditingController _searchController = TextEditingController();
   
   String _activeCategory = 'All';
-  Set<String> _favoriteIds = {}; // Local fav state
+  String _sortOption = 'default';
 
   final List<String> _categories = ['All', 'Rings', 'Bracelets', 'Chokers', 'Lockets', 'Necklaces', 'Earrings'];
+
+  double _parsePrice(dynamic price) {
+    final cleaned = price.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(cleaned) ?? 0;
+  }
+
+  List<dynamic> _applySort(List<dynamic> products) {
+    final sorted = List<dynamic>.from(products);
+    if (_sortOption == 'price_low') {
+      sorted.sort((a, b) => _parsePrice(a['price']).compareTo(_parsePrice(b['price'])));
+    } else if (_sortOption == 'price_high') {
+      sorted.sort((a, b) => _parsePrice(b['price']).compareTo(_parsePrice(a['price'])));
+    }
+    return sorted;
+  }
 
   @override
   void initState() {
     super.initState();
-    _refreshFavorites(); // Load favs
-    
+    _favoritesState.addListener(_onFavoritesChanged);
+    _favoritesState.refresh();
+
     Future.microtask(() {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args != null && args is String) {
@@ -51,13 +72,30 @@ class _CategoryScreenState extends State<CategoryScreen> {
     });
   }
 
-  Future<void> _refreshFavorites() async {
-    final favs = await _productService.getFavorites();
-    if (mounted) {
-       setState(() {
-          _favoriteIds = favs.map((f) => f['productId']['_id'].toString()).toSet();
-       });
+  void _onFavoritesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      appRouteObserver.subscribe(this, route);
     }
+  }
+
+  @override
+  void didPopNext() {
+    _favoritesState.refresh();
+  }
+
+  @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    _favoritesState.removeListener(_onFavoritesChanged);
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _fetchProducts({String query = ''}) {
@@ -67,31 +105,19 @@ class _CategoryScreenState extends State<CategoryScreen> {
     });
   }
 
-  Future<void> _toggleFavorite(String productId) async {
-     final wasLiked = _favoriteIds.contains(productId);
-     setState(() {
-       if (wasLiked) {
-         _favoriteIds.remove(productId);
-       } else {
-         _favoriteIds.add(productId);
-       }
-     });
-     final result = await _productService.toggleFavorite(productId);
+  Future<void> _toggleFavorite(dynamic product) async {
+     if (!await AuthHelper.requireAuth(context)) return;
+
+     final productId = normalizeProductId(product['_id'] ?? product['id']);
+     if (productId == null) return;
+
+     final result = await _favoritesState.toggle(productId);
      if (!mounted) return;
      if (result == null) {
-       setState(() {
-         if (wasLiked) {
-           _favoriteIds.add(productId);
-         } else {
-           _favoriteIds.remove(productId);
-         }
-       });
        ScaffoldMessenger.of(context).showSnackBar(
          const SnackBar(content: Text('Could not update favorites. Please login again.')),
        );
-       return;
      }
-     await _refreshFavorites();
   }
 
   @override
@@ -156,6 +182,34 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                 }).toList(),
                             ),
                         ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: zBgColor,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _sortOption,
+                                icon: const Icon(Icons.sort, size: 18, color: zDarkBlue),
+                                style: const TextStyle(fontSize: 13, color: zDarkBlue),
+                                items: const [
+                                  DropdownMenuItem(value: 'default', child: Text('Sort by')),
+                                  DropdownMenuItem(value: 'price_low', child: Text('Price: Low to High')),
+                                  DropdownMenuItem(value: 'price_high', child: Text('Price: High to Low')),
+                                ],
+                                onChanged: (val) {
+                                  if (val == null) return;
+                                  setState(() => _sortOption = val);
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                 ),
             ),
@@ -173,7 +227,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                              return const Center(child: Text('No products found'));
                         }
 
-                        final products = snapshot.data!;
+                        final products = _applySort(snapshot.data!);
 
                         return GridView.builder(
                             padding: const EdgeInsets.all(16),
@@ -183,7 +237,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                             itemCount: products.length,
                             itemBuilder: (context, index) {
                                 final product = products[index];
-                                final isLiked = _favoriteIds.contains(product['_id']);
+                                final isLiked = _favoritesState.isFavorite(product);
                                 
                                 int remaining = 1;
                                 if (product['inventory'] != null) {
@@ -212,7 +266,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                                                 child: Image.network(
                                                                     product['image'].toString().startsWith('http') 
                                                                       ? product['image'] 
-                                                                      : AppConstants.baseUrl.replaceAll('/api', '') + '/' + product['image'].toString(),
+                                                                      : '${AppConstants.baseUrl.replaceAll('/api', '')}/${product['image']}',
                                                                     width: double.infinity,
                                                                     fit: BoxFit.cover,
                                                                     errorBuilder: (_,__,___) => const Icon(Icons.error),
@@ -221,7 +275,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                                             Positioned(
                                                                 top: 8, right: 8,
                                                                 child: GestureDetector(
-                                                                    onTap: () => _toggleFavorite(product['_id']),
+                                                                    onTap: () => _toggleFavorite(product),
                                                                     child: Container(
                                                                         padding: const EdgeInsets.all(6),
                                                                         decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),

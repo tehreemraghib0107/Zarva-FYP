@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/product_service.dart';
+import '../config/route_observer.dart';
 import '../services/notification_service.dart';
 import '../widgets/custom_scaffold.dart';
 import '../constants.dart';
+import '../utils/auth_helper.dart';
+import '../utils/product_id_helper.dart';
+import '../services/favorites_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -12,10 +16,10 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with RouteAware {
   final ProductService _productService = ProductService();
   final NotificationService _notificationService = NotificationService();
-
+  final FavoritesState _favoritesState = FavoritesState();
   // 🔥 Banner controller
   late PageController _pageController;
   int _currentBannerIndex = 0;
@@ -24,7 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
   
   // 🔍 Data State
   late Future<List<dynamic>> _productsFuture;
-  Set<String> _favoriteIds = {}; // Local state for blue hearts
   int _unreadNotifications = 0;
   
   // 🔥 Category Data (Matching DB categories)
@@ -49,12 +52,31 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _pageController = PageController();
     _startBannerAutoSlide();
+    _favoritesState.addListener(_onFavoritesChanged);
     _loadData();
+  }
+
+  void _onFavoritesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    _favoritesState.refresh();
   }
 
   void _loadData() {
     _productsFuture = _productService.fetchProducts();
-    _refreshFavorites();
+    _favoritesState.refresh();
     _refreshUnreadNotifications();
   }
 
@@ -66,47 +88,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _refreshFavorites() async {
-    final favs = await _productService.getFavorites();
-    if (mounted) {
-       setState(() {
-          _favoriteIds = favs.map((f) => f['productId']['_id'].toString()).toSet();
-       });
-    }
-  }
-
   void _onSearchSubmitted(String query) {
      Navigator.pushNamed(context, '/category', arguments: query);
   }
 
-  Future<void> _toggleFavorite(String productId) async {
-     final wasLiked = _favoriteIds.contains(productId);
-     setState(() {
-       if (wasLiked) {
-         _favoriteIds.remove(productId);
-       } else {
-         _favoriteIds.add(productId);
-       }
-     });
+  Future<void> _toggleFavorite(dynamic product) async {
+     if (!await AuthHelper.requireAuth(context)) return;
 
-     final result = await _productService.toggleFavorite(productId);
+     final productId = normalizeProductId(product['_id'] ?? product['id']);
+     if (productId == null) return;
+
+     final result = await _favoritesState.toggle(productId);
      if (!mounted) return;
      if (result == null) {
-       // Revert optimistic UI when backend did not persist the change.
-       setState(() {
-         if (wasLiked) {
-           _favoriteIds.add(productId);
-         } else {
-           _favoriteIds.remove(productId);
-         }
-       });
        ScaffoldMessenger.of(context).showSnackBar(
          const SnackBar(content: Text('Could not update favorites. Please login again.')),
        );
-       return;
      }
-
-     await _refreshFavorites();
   }
 
   void _startBannerAutoSlide() {
@@ -124,6 +122,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
+    _favoritesState.removeListener(_onFavoritesChanged);
     _bannerTimer?.cancel();
     _pageController.dispose();
     _searchController.dispose();
@@ -301,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         itemBuilder: (_, index) {
                             final product = products[index];
-                            final isLiked = _favoriteIds.contains(product['_id']);
+                            final isLiked = _favoritesState.isFavorite(product);
                             
                             int remaining = 1;
                             if (product['inventory'] != null) {
@@ -330,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                             child: Image.network(
                                                                 product['image'].toString().startsWith('http') 
                                                                   ? product['image'] 
-                                                                  : AppConstants.baseUrl.replaceAll('/api', '') + '/' + product['image'].toString(),
+                                                                  : '${AppConstants.baseUrl.replaceAll('/api', '')}/${product['image']}',
                                                                 width: double.infinity, fit: BoxFit.cover,
                                                                 errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
                                                             ),
@@ -338,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                         Positioned(
                                                             right: 8, top: 8,
                                                             child: GestureDetector(
-                                                                onTap: () => _toggleFavorite(product['_id']),
+                                                                onTap: () => _toggleFavorite(product),
                                                                 child: Container(
                                                                     padding: const EdgeInsets.all(6),
                                                                     decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
@@ -421,9 +421,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListTile(
       leading: Icon(icon, color: Colors.white),
       title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
-      onTap: () {
+      onTap: () async {
         Navigator.pop(context);
-        Navigator.pushReplacementNamed(context, route);
+        if (route == '/favorites' || route == '/cart') {
+          if (!await AuthHelper.isAuthenticated()) {
+            if (context.mounted) {
+              AuthHelper.showLoginRedirect(context);
+            }
+            return;
+          }
+        }
+        if (context.mounted) {
+          Navigator.pushReplacementNamed(context, route);
+        }
       },
     );
   }
