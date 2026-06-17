@@ -22,7 +22,7 @@ class _LoginRequiredGateState extends State<LoginRequiredGate> {
   }
 
   Future<void> _check() async {
-    final authed = await AuthHelper.isAuthenticated();
+    final authed = await AuthHelper.validateSession();
     if (!mounted) return;
     setState(() {
       _authed = authed;

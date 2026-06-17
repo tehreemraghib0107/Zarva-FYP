@@ -61,9 +61,11 @@ class CustomScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const Color zDarkBlue = Color(0xFF0B1C2D);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? const Color(0xFF1A1A1A) : const Color(0xFFF8F9FA);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: backgroundColor,
       drawer: drawer,
       appBar: AppBar(
         backgroundColor: zDarkBlue,

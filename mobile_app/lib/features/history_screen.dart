@@ -12,7 +12,7 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   final OrderService _orderService = OrderService();
-  late Future<List<dynamic>> _historyFuture;
+  Future<List<dynamic>>? _historyFuture;
 
   @override
   void initState() {
@@ -67,9 +67,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return CustomScaffold(
       currentIndex: 4, // Context of Account
-      body: FutureBuilder<List<dynamic>>(
-        future: _historyFuture,
-        builder: (context, snapshot) {
+      body: _historyFuture == null
+          ? const Center(child: CircularProgressIndicator())
+          : FutureBuilder<List<dynamic>>(
+              future: _historyFuture,
+              builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {

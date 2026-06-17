@@ -13,12 +13,14 @@ Stages:
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import logging
 import os
 import random
 import sys
 import uuid
+import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 from io import BytesIO
@@ -1560,6 +1562,119 @@ def save_chat_to_db(
 
 
 # ---------------------------------------------------------------------------
+# AR Try-On — YOLO jewelry extraction + transparent PNG for web overlay
+# ---------------------------------------------------------------------------
+
+
+def _category_yolo_classes(category: str) -> List[str]:
+    cat = (category or "").lower()
+    if "earring" in cat:
+        return ["earring"]
+    if "choker" in cat:
+        return ["choker", "necklace", "pendant"]
+    if "locket" in cat:
+        return ["locket", "pendant", "necklace"]
+    return ["necklace", "pendant", "choker"]
+
+
+def _yolo_crop_for_category(
+    bgr: np.ndarray, yolo_model: YOLO, category: str
+) -> Tuple[np.ndarray, str]:
+    """Detect and crop jewelry matching the product category."""
+    classes = _category_yolo_classes(category)
+    yolo_model.set_classes(classes)
+    crop, item_type = _yolo_best_crop(bgr, yolo_model)
+    if crop is None:
+        h, w = bgr.shape[:2]
+        cat = (category or "").lower()
+        if "earring" in cat:
+            side = int(min(w, h) * 0.55)
+            sx = (w - side) // 2
+            sy = (h - side) // 2
+            crop = bgr[sy : sy + side, sx : sx + side]
+            item_type = "earring"
+        else:
+            sy = int(h * 0.15)
+            crop = bgr[sy:, :]
+            item_type = "necklace"
+    return crop, item_type
+
+
+def _trim_transparent_rgba(rgba: np.ndarray) -> np.ndarray:
+    alpha = rgba[:, :, 3]
+    coords = cv2.findNonZero(alpha)
+    if coords is None:
+        return rgba
+    x, y, w, h = cv2.boundingRect(coords)
+    return rgba[y : y + h, x : x + w]
+
+
+def remove_jewelry_background(bgr: np.ndarray) -> np.ndarray:
+    """Extract foreground jewelry with alpha channel (GrabCut + luminance mask)."""
+    if bgr is None or bgr.size == 0:
+        return np.zeros((64, 64, 4), dtype=np.uint8)
+
+    h, w = bgr.shape[:2]
+    rgba = cv2.cvtColor(bgr, cv2.COLOR_BGR2BGRA)
+
+    mask = np.zeros((h, w), np.uint8)
+    bgd_model = np.zeros((1, 65), np.float64)
+    fgd_model = np.zeros((1, 65), np.float64)
+    margin = max(4, min(h, w) // 16)
+    rect = (margin, margin, max(1, w - 2 * margin), max(1, h - 2 * margin))
+    try:
+        cv2.grabCut(bgr, mask, rect, bgd_model, fgd_model, 4, cv2.GC_INIT_WITH_RECT)
+        fg_mask = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+    except cv2.error:
+        fg_mask = np.full((h, w), 255, dtype=np.uint8)
+
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    _, light_mask = cv2.threshold(gray, 235, 255, cv2.THRESH_BINARY)
+    light_mask = cv2.GaussianBlur(light_mask, (5, 5), 0)
+    combined = cv2.bitwise_and(fg_mask, cv2.bitwise_not(light_mask))
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, kernel, iterations=2)
+    combined = cv2.morphologyEx(combined, cv2.MORPH_OPEN, kernel, iterations=1)
+
+    rgba[:, :, 3] = combined
+    return _trim_transparent_rgba(rgba)
+
+
+def bgra_to_data_url(rgba: np.ndarray) -> str:
+    ok, buf = cv2.imencode(".png", rgba)
+    if not ok:
+        raise ValueError("Failed to encode jewelry PNG.")
+    encoded = base64.b64encode(buf.tobytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def fetch_image_bgr_from_url(url: str) -> np.ndarray:
+    with urllib.request.urlopen(url, timeout=30) as response:
+        raw = response.read()
+    arr = np.frombuffer(raw, dtype=np.uint8)
+    bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if bgr is None:
+        raise ValueError("Could not decode image from URL.")
+    return bgr
+
+
+def extract_jewelry_overlay(bgr: np.ndarray, category: str) -> Dict[str, Any]:
+    """YOLO crop → background removal → transparent PNG data URL for AR overlay."""
+    yolo = _init_yolo_world()
+    crop, item_type = _yolo_crop_for_category(bgr, yolo, category)
+    rgba = remove_jewelry_background(crop)
+    h, w = rgba.shape[:2]
+    return {
+        "overlayDataUrl": bgra_to_data_url(rgba),
+        "itemType": item_type,
+        "width": w,
+        "height": h,
+        "aspectRatio": round(w / max(h, 1), 4),
+    }
+
+
+# ---------------------------------------------------------------------------
 # STEP 5 — FastAPI production wrapper
 # ---------------------------------------------------------------------------
 
@@ -1634,6 +1749,71 @@ def create_app() -> "FastAPI":
             "sessionId": str(uuid.uuid4()),
             **payload,
         }
+
+    @app.post("/api/ai/extract-jewelry")
+    async def extract_jewelry(
+        category: str = Form(default="necklace"),
+        imageUrl: str = Form(default=""),
+        image: Optional[UploadFile] = File(default=None),
+    ) -> Dict[str, Any]:
+        """Extract isolated jewelry PNG (2D asset) for web AR try-on overlay."""
+        try:
+            from ar_processor import prepare_ar_asset
+            uploads_dir = AI_ROOT.parent / "backend" / "uploads"
+            os.makedirs(uploads_dir, exist_ok=True)
+
+            temp_filename = f"temp_extract_{uuid.uuid4()}"
+            temp_path = None
+
+            if image is not None:
+                _, ext = os.path.splitext(image.filename or ".png")
+                if not ext:
+                    ext = ".png"
+                temp_filename = f"{temp_filename}{ext}"
+                temp_path = os.path.join(uploads_dir, temp_filename)
+                
+                raw = await image.read()
+                with open(temp_path, "wb") as f:
+                    f.write(raw)
+            elif imageUrl.strip():
+                url = imageUrl.strip()
+                ext = ".png"
+                for possible_ext in (".png", ".jpg", ".jpeg", ".webp"):
+                    if possible_ext in url.lower():
+                        ext = possible_ext
+                        break
+                temp_filename = f"{temp_filename}{ext}"
+                temp_path = os.path.join(uploads_dir, temp_filename)
+
+                parsed_local = False
+                if "/uploads/" in url:
+                    local_filename = url.split("/uploads/")[-1]
+                    local_filename = local_filename.split("?")[0]
+                    local_path = os.path.join(uploads_dir, local_filename)
+                    if os.path.exists(local_path):
+                        temp_path = local_path
+                        parsed_local = True
+                
+                if not parsed_local:
+                    with urllib.request.urlopen(url, timeout=30) as response:
+                        raw = response.read()
+                    with open(temp_path, "wb") as f:
+                        f.write(raw)
+            else:
+                return {"success": False, "error": "imageUrl or image file is required."}
+
+            payload = prepare_ar_asset(temp_path, category)
+            
+            if temp_path and "temp_extract_" in os.path.basename(temp_path) and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception as cleanup_err:
+                    logger.warning("Failed to remove temporary file %s: %s", temp_path, cleanup_err)
+
+            return payload
+        except Exception as exc:
+            logger.exception("Jewelry extraction failed")
+            return {"success": False, "error": str(exc)}
 
     @app.post("/api/chat/text")
     async def chat_text(

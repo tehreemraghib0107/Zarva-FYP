@@ -22,6 +22,8 @@ class PaymentMethodScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const Color zDarkBlue = Color(0xFF0B1C2D);
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardColor;
     const double deliveryCharges = 250.0;
     final double total = subtotal + deliveryCharges;
 
@@ -32,9 +34,9 @@ class PaymentMethodScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Select Payment Method',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: zDarkBlue),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isDark ? Colors.white : zDarkBlue),
             ),
             const SizedBox(height: 30),
             _paymentOption(
@@ -85,7 +87,7 @@ class PaymentMethodScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
               ),
@@ -111,7 +113,7 @@ class PaymentMethodScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5)],
@@ -129,7 +131,7 @@ class PaymentMethodScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                  Text(subtitle, style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey.shade600)),
                 ],
               ),
             ),

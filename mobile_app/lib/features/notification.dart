@@ -12,13 +12,13 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   final NotificationService _service = NotificationService();
-  late Future<List<dynamic>> _future;
+  Future<List<dynamic>>? _future;
 
   @override
   void initState() {
     super.initState();
     _future = _service.fetchNotifications(limit: 100);
-    _future.then((_) => _service.markAllAsRead());
+    _future?.then((_) => _service.markAllAsRead());
   }
 
   String _timeAgo(DateTime dt) {
@@ -55,9 +55,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ),
       ),
 
-      body: FutureBuilder<List<dynamic>>(
-        future: _future,
-        builder: (context, snapshot) {
+      body: _future == null
+          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : FutureBuilder<List<dynamic>>(
+              future: _future,
+              builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: Colors.white));
           }

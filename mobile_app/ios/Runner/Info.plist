@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>ZARVA needs camera access for jewelry AR try-on.</string>
 </dict>
 </plist>

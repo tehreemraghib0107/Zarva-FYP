@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
 
 class AuthHelper {
+  static Future<void> clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token');
+    await prefs.remove('isLoggedIn');
+    await prefs.remove('user_id');
+    await prefs.remove('user_email');
+  }
+
   static Future<bool> isAuthenticated() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -9,9 +18,18 @@ class AuthHelper {
     return token != null && token.isNotEmpty && loggedIn;
   }
 
-  /// Returns true when the user is signed in; otherwise shows the signup sheet.
+  /// Validates token against backend — clears stale sessions from web restarts.
+  static Future<bool> validateSession() async {
+    if (!await isAuthenticated()) return false;
+    final result = await AuthService().getProfile();
+    if (result['success'] == true) return true;
+    await clearSession();
+    return false;
+  }
+
+  /// Returns true when the user has a valid session; otherwise shows the Join ZARVA sheet.
   static Future<bool> requireAuth(BuildContext context) async {
-    if (await isAuthenticated()) return true;
+    if (await validateSession()) return true;
     if (context.mounted) {
       showLoginRedirect(context);
     }
@@ -35,7 +53,7 @@ class AuthHelper {
                 const Icon(Icons.lock_outline, size: 64, color: Color(0xFF0B1C2D)),
                 const SizedBox(height: 16),
                 const Text(
-                  "Shopping Vault Locked",
+                  "Join ZARVA",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -44,7 +62,7 @@ class AuthHelper {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  "Please sign up or login to access your shopping vault.",
+                  "Please sign up or log in to access your shopping vault.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 15,

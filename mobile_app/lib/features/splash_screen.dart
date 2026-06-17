@@ -17,7 +17,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void checkLogin() async {
-    final authed = await AuthHelper.isAuthenticated();
+    final authed = await AuthHelper.validateSession();
 
     if (!mounted) return;
 

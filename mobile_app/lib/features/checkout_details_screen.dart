@@ -215,6 +215,8 @@ class _CheckoutDetailsScreenState extends State<CheckoutDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     const Color zDarkBlue = Color(0xFF0B1C2D);
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardColor;
     final double total = widget.subtotal + widget.deliveryCharges;
 
     return CustomScaffold(
@@ -226,9 +228,9 @@ class _CheckoutDetailsScreenState extends State<CheckoutDetailsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Order ID: $_orderId', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('Order ID: $_orderId', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.grey)),
               const SizedBox(height: 10),
-              const Text('Shipping Details', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: zDarkBlue)),
+              Text('Shipping Details', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isDark ? Colors.white : zDarkBlue)),
               const SizedBox(height: 20),
               
               _buildField('Full Name', _nameController, Icons.person_outline),
@@ -240,12 +242,12 @@ class _CheckoutDetailsScreenState extends State<CheckoutDetailsScreen> {
               _buildField('Shipping Address', _addressController, Icons.location_on_outlined, maxLines: 3),
               
               const SizedBox(height: 40),
-              const Text('Order Summary', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: zDarkBlue)),
+              Text('Order Summary', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : zDarkBlue)),
               const SizedBox(height: 15),
               
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16)),
+                decoration: BoxDecoration(color: isDark ? Colors.grey[800] : Colors.grey.shade100, borderRadius: BorderRadius.circular(16)),
                 child: Column(
                   children: [
                     ...widget.items.map((item) => Padding(

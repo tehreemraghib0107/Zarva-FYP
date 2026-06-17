@@ -27,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   final TextEditingController _searchController = TextEditingController();
   
   // 🔍 Data State
-  late Future<List<dynamic>> _productsFuture;
+  Future<List<dynamic>>? _productsFuture;
   int _unreadNotifications = 0;
   
   // 🔥 Category Data (Matching DB categories)
@@ -271,7 +271,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             const SizedBox(height: 25),
 
             // 🔥 PRODUCTS GRID
-            FutureBuilder<List<dynamic>>(
+            _productsFuture == null
+                ? const Center(child: CircularProgressIndicator())
+                : FutureBuilder<List<dynamic>>(
                 future: _productsFuture,
                  builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {

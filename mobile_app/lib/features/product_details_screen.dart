@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../constants.dart';
 import '../utils/auth_helper.dart';
 import 'payment_method_screen.dart';
+import 'ar/ar_tryon_screen.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -91,7 +92,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added ${widget.product['name']} to cart!'),
+        content: Text('Added ${widget.product['name']} to cart!', style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF0B1C2D),
         duration: const Duration(seconds: 1),
         action: SnackBarAction(
@@ -276,7 +277,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     const Color zDarkBlue = Color(0xFF0B1C2D);
-    const Color zGreyBg = Color(0xFFF2F2F2); // Light grey for product background
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardColor;
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final canvasBg = Theme.of(context).canvasColor;
     
     final bool isRing = widget.product['category'] == 'Rings';
     
@@ -287,7 +291,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final bool isOutOfStock = remaining <= 0;
     
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scaffoldBg,
       body: Column(
         children: [
           // Top Half - Product Image & Back Button
@@ -297,7 +301,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               children: [
                 Container(
                   width: double.infinity,
-                  color: zGreyBg,
+                  color: canvasBg,
                   child: Center(
                     child: Hero(
                       tag: widget.product['_id'] ?? widget.product['name'],
@@ -320,12 +324,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     onTap: () => Navigator.pop(context),
                     child: Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
+                      decoration: BoxDecoration(
+                        color: cardColor,
                         shape: BoxShape.circle,
                         boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
                       ),
-                      child: const Icon(Icons.arrow_back, color: zDarkBlue),
+                      child: Icon(Icons.arrow_back, color: isDark ? Colors.white : zDarkBlue),
                     ),
                   ),
                 ),
@@ -336,14 +340,33 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Camera Icon
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+                      GestureDetector(
+                        onTap: () {
+                          final productCategory = widget.product['category']?.toString() ?? 'Jewelry';
+                          final imageField = widget.product['imageUrl'] ?? widget.product['image'] ?? '';
+                          final productImageUrl = imageField.toString().startsWith('http')
+                              ? imageField.toString()
+                              : '${AppConstants.baseUrl.replaceAll('/api', '')}/${imageField.toString()}';
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ArTryOnScreen(
+                                productCategory: productCategory,
+                                productImageUrl: productImageUrl,
+                                productName: widget.product['name']?.toString(),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+                          ),
+                          child: const Icon(Icons.camera_alt_outlined, color: zDarkBlue),
                         ),
-                        child: const Icon(Icons.camera_alt_outlined, color: zDarkBlue),
                       ),
                       const SizedBox(width: 12),
                       // WhatsApp Icon
@@ -351,8 +374,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         onTap: _launchWhatsApp,
                         child: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: cardColor,
                             shape: BoxShape.circle,
                             boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
                           ),
@@ -378,9 +401,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(30),
                   topRight: Radius.circular(30),
                 ),
@@ -391,25 +414,25 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   children: [
                     Text(
                       widget.product['name'] ?? 'Product Name',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w600,
-                        color: zDarkBlue,
+                        color: isDark ? Colors.white : zDarkBlue,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.grey[200],
+                        color: isDark ? Colors.grey[800] : Colors.grey[200],
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         widget.product['price'] ?? 'PKR 0',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: zDarkBlue,
+                          color: isDark ? Colors.white : zDarkBlue,
                         ),
                       ),
                     ),
@@ -417,8 +440,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     
                     Text(
                       widget.product['description'] ?? "Handcrafted featuring delicate stones set in polished metal. Perfect for stacking or wearing alone to add a touch of elegance to your daily look.",
-                      style: const TextStyle(
-                        color: Colors.grey,
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.grey,
                         height: 1.5,
                         fontSize: 14,
                       ),
@@ -430,12 +453,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             "Ring Size (US)",
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: zDarkBlue,
+                              color: isDark ? Colors.white : zDarkBlue,
                             ),
                           ),
                           IconButton(
@@ -462,9 +485,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               height: 40,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: isSelected ? Colors.grey[300] : Colors.white,
+                                color: isSelected ? (isDark ? Colors.grey[700] : Colors.grey[300]) : cardColor,
                                 border: Border.all(
-                                  color: isSelected ? zDarkBlue : Colors.grey[300]!,
+                                  color: isSelected ? zDarkBlue : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
                                   width: isSelected ? 1.5 : 1,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -472,7 +495,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               child: Text(
                                 size,
                                 style: TextStyle(
-                                  color: isSelected ? zDarkBlue : Colors.black54,
+                                  color: isSelected ? zDarkBlue : (isDark ? Colors.white70 : Colors.black54),
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
@@ -500,7 +523,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 isOutOfStock ? "Out of Stock" : "Add to Cart",
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: isOutOfStock ? Colors.grey[600] : zDarkBlue,
+                                  color: isOutOfStock ? (isDark ? Colors.white70 : Colors.grey[600]) : zDarkBlue,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -526,7 +549,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 isOutOfStock ? "Unavailable" : "Buy Now",
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: isOutOfStock ? Colors.grey[600] : Colors.white,
+                                  color: isOutOfStock ? (isDark ? Colors.white70 : Colors.grey[600]) : Colors.white,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -564,7 +587,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: isDark ? Colors.grey[800] : Colors.grey[100],
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
@@ -593,7 +616,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             decoration: InputDecoration(
                               hintText: 'Share your experience (optional)',
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: Theme.of(context).cardColor,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                                 borderSide: BorderSide.none,
@@ -616,9 +639,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Customer Reviews',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: zDarkBlue),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : zDarkBlue),
                     ),
                     const SizedBox(height: 8),
                     if (_loadingReviews)
@@ -656,7 +679,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               if ((r['comment'] ?? '').toString().isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 4),
-                                  child: Text((r['comment'] ?? '').toString()),
+                                  child: Text((r['comment'] ?? '').toString(), style: TextStyle(color: isDark ? Colors.white70 : Colors.black87)),
                                 ),
                             ],
                           ),

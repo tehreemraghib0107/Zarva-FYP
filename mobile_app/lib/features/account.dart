@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_scaffold.dart';
 import '../services/auth_service.dart';
 import '../services/cart_service.dart';
+import '../utils/auth_helper.dart';
 
 class AccountMenuScreen extends StatefulWidget {
   const AccountMenuScreen({super.key});
@@ -23,14 +24,17 @@ class _AccountMenuScreenState extends State<AccountMenuScreen> {
 
   Future<void> _loadProfile() async {
     final result = await _authService.getProfile();
-    if (mounted) {
-      setState(() {
-        if (result['success']) {
-          _userData = result['user'];
-        }
-        _isLoading = false;
-      });
+    if (!mounted) return;
+    if (result['success'] != true) {
+      await AuthHelper.clearSession();
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
     }
+    setState(() {
+      _userData = result['user'];
+      _isLoading = false;
+    });
   }
 
   @override
@@ -103,9 +107,9 @@ class _AccountMenuScreenState extends State<AccountMenuScreen> {
             ]),
 
             _buildSection([
-              _accountItem(context, Icons.settings_outlined, "Settings", null),
-              _accountItem(context, Icons.help_outline, "Help Center", null),
-              _accountItem(context, Icons.info_outline, "About Us", null),
+              _accountItem(context, Icons.settings_outlined, "Appearance", '/settings'),
+              _accountItem(context, Icons.help_outline, "Help Center", '/help_center'),
+              _accountItem(context, Icons.info_outline, "About Us", '/about_us'),
             ]),
 
             // Logout Button
@@ -229,12 +233,14 @@ class _AccountMenuScreenState extends State<AccountMenuScreen> {
   }
 
   Widget _buildSection(List<Widget> items) {
+    final cardColor = Theme.of(context).cardColor;
+    final shadowColor = Theme.of(context).brightness == Brightness.dark ? Colors.black54 : Colors.black.withOpacity(0.03);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: shadowColor, blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(children: items),
     );

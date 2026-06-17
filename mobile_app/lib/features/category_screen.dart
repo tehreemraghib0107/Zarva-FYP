@@ -18,7 +18,7 @@ class CategoryScreen extends StatefulWidget {
 class _CategoryScreenState extends State<CategoryScreen> with RouteAware {
   final ProductService _productService = ProductService();
   final FavoritesState _favoritesState = FavoritesState();
-  late Future<List<dynamic>> _productsFuture;
+  Future<List<dynamic>>? _productsFuture;
   final TextEditingController _searchController = TextEditingController();
   
   String _activeCategory = 'All';
@@ -46,6 +46,7 @@ class _CategoryScreenState extends State<CategoryScreen> with RouteAware {
     super.initState();
     _favoritesState.addListener(_onFavoritesChanged);
     _favoritesState.refresh();
+    _fetchProducts();
 
     Future.microtask(() {
       final args = ModalRoute.of(context)?.settings.arguments;
@@ -53,21 +54,19 @@ class _CategoryScreenState extends State<CategoryScreen> with RouteAware {
         if (_categories.contains(args)) {
            setState(() {
              _activeCategory = args;
-             _fetchProducts();
            });
+           _fetchProducts();
         } else {
            setState(() {
              _searchController.text = args;
-             _fetchProducts(query: args);
            });
+           _fetchProducts(query: args);
         }
       } else if (widget.initialCategory != null) {
          setState(() {
              _activeCategory = widget.initialCategory!;
-             _fetchProducts();
          });
-      } else {
-         _fetchProducts(); 
+         _fetchProducts();
       }
     });
   }
@@ -216,7 +215,9 @@ class _CategoryScreenState extends State<CategoryScreen> with RouteAware {
             
             // Product Grid
             Expanded(
-                child: FutureBuilder<List<dynamic>>(
+                child: _productsFuture == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : FutureBuilder<List<dynamic>>(
                     future: _productsFuture,
                     builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {

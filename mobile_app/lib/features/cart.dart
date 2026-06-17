@@ -216,6 +216,8 @@ class _CartScreenState extends State<CartScreen> {
   @override
   Widget build(BuildContext context) {
     const Color zDarkBlue = Color(0xFF0B1C2D);
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardColor;
 
     if (!_authChecked) {
       return const CustomScaffold(
@@ -260,7 +262,7 @@ class _CartScreenState extends State<CartScreen> {
         ),
       ],
       body: _cartService.items.isEmpty 
-        ? const Center(child: Text("Your cart is empty", style: TextStyle(fontSize: 18, color: Colors.grey)))
+        ? Center(child: Text("Your cart is empty", style: TextStyle(fontSize: 18, color: isDark ? Colors.white70 : Colors.grey)))
         : Column(
         children: [
           Expanded(
@@ -274,11 +276,11 @@ class _CartScreenState extends State<CartScreen> {
           ),
 
           // 🔽 PROMO & BOTTOM BAR
-          Container(
+            Container(
              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-             decoration: const BoxDecoration(
-                 color: Colors.white,
-                 borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+             decoration: BoxDecoration(
+               color: cardColor,
+               borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
              ),
              child: Column(
                  children: [
@@ -286,7 +288,7 @@ class _CartScreenState extends State<CartScreen> {
                      Container(
                        padding: const EdgeInsets.symmetric(horizontal: 16),
                        decoration: BoxDecoration(
-                         color: Colors.grey.shade100,
+                         color: isDark ? Colors.grey[800] : Colors.grey.shade100,
                          borderRadius: BorderRadius.circular(12),
                        ),
                        child: Row(
@@ -342,8 +344,8 @@ class _CartScreenState extends State<CartScreen> {
                      
                      // Totals
                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                         const Text("Sub Total", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                         Text("PKR ${_cartService.subTotal.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                       Text("Sub Total", style: TextStyle(color: isDark ? Colors.white70 : Colors.grey, fontSize: 14)),
+                       Text("PKR ${_cartService.subTotal.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black)),
                      ]),
                      if (_discountPercent > 0) ...[
                        const SizedBox(height: 10),
@@ -356,8 +358,8 @@ class _CartScreenState extends State<CartScreen> {
                      ],
                      const SizedBox(height: 10),
                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                         const Text("Shipping charges", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                         Text("PKR ${_shipping.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                       Text("Shipping charges", style: TextStyle(color: isDark ? Colors.white70 : Colors.grey, fontSize: 14)),
+                       Text("PKR ${_shipping.toStringAsFixed(0)}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black)),
                      ]),
                      const SizedBox(height: 20),
 

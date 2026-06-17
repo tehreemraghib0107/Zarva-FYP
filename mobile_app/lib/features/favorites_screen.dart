@@ -15,7 +15,7 @@ class FavoritesScreen extends StatefulWidget {
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
   final ProductService _productService = ProductService();
-  late Future<List<dynamic>> _favoritesFuture;
+  Future<List<dynamic>>? _favoritesFuture;
 
   @override
   void initState() {
@@ -41,9 +41,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     return CustomScaffold(
       currentIndex: 1,
-      body: FutureBuilder<List<dynamic>>(
-        future: _favoritesFuture,
-        builder: (context, snapshot) {
+      body: _favoritesFuture == null
+          ? const Center(child: CircularProgressIndicator())
+          : FutureBuilder<List<dynamic>>(
+              future: _favoritesFuture,
+              builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {

@@ -63,8 +63,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cardColor = Theme.of(context).cardColor;
+    final primaryColor = Theme.of(context).primaryColor;
     return Scaffold(
-      backgroundColor: const Color(0xFF0B1C2D), // Dark blue background
+      backgroundColor: primaryColor, // Dark blue background
       body: SafeArea(
         child: Column(
           children: [
@@ -79,14 +81,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
             const SizedBox(height: 20),
 
-            // WHITE LOGIN CARD
+            // LOGIN CARD
             Expanded(
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF2F2F2),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: const BorderRadius.only(
                     topRight: Radius.circular(40),
                   ),
                 ),
@@ -97,11 +99,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 20),
 
                       // LOGIN TITLE
-                      const Text(
+                      Text(
                         'Login',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                         ),
                       ),
 
@@ -132,19 +135,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           TextButton(
                             onPressed: () {},
-                            child: const Text(
+                            child: Text(
                               'Forgot password?',
-                              style: TextStyle(color: Colors.black54),
+                              style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54),
                             ),
                           ),
                           TextButton(
                             onPressed: () =>
                                 Navigator.pushNamed(context, '/signup'),
-                            child: const Text(
+                            child: Text(
                               'Create an account',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.black,
+                                color: Theme.of(context).textTheme.bodyLarge?.color,
                               ),
                             ),
                           ),
@@ -223,9 +226,9 @@ class _LoginScreenState extends State<LoginScreen> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
-          color: Colors.black54,
+          color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
         ),
       ),
     );
@@ -242,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Theme.of(context).cardColor,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         border: OutlineInputBorder(
