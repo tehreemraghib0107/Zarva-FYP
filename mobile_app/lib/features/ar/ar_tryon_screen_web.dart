@@ -9,12 +9,14 @@ class ArTryOnScreen extends StatefulWidget {
   final String productCategory;
   final String productImageUrl;
   final String? productName;
+  final String? productCode;
 
   const ArTryOnScreen({
     super.key,
     required this.productCategory,
     required this.productImageUrl,
     this.productName,
+    this.productCode,
   });
 
   @override

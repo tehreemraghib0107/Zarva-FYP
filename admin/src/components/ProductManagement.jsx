@@ -12,7 +12,8 @@ const ProductManagement = () => {
         category: 'Rings',
         price: '',
         image: '', 
-        description: ''
+        description: '',
+        productCode: ''
     });
     const [selectedFile, setSelectedFile] = useState(null);
 
@@ -75,7 +76,8 @@ const ProductManagement = () => {
             category: product.category,
             price: product.price,
             image: product.image,
-            description: product.description || ''
+            description: product.description || '',
+            productCode: product.productCode || ''
         });
         setSelectedFile(null);
         setShowModal(true);
@@ -225,6 +227,11 @@ const ProductManagement = () => {
                                         {selectedFile ? selectedFile.name : formData.image ? `Current: ${formData.image}` : 'No image selected'}
                                     </span>
                                 </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Product Code</label>
+                                <input type="text" name="productCode" className="form-control" value={formData.productCode} onChange={handleInputChange} />
                             </div>
 
                             <div className="form-group">

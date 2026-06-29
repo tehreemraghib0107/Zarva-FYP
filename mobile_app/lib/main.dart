@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'features/splash_screen.dart';
 import 'features/login_screen.dart';
 import 'features/signup_screen.dart';
@@ -22,7 +24,12 @@ import 'config/route_observer.dart';
 import 'services/theme_service.dart';
 
 void main() {
-  runApp(const ZarvaApp());
+  runApp(
+    DevicePreview(
+      enabled: !kReleaseMode,
+      builder: (context) => const ZarvaApp(),
+    ),
+  );
 }
 
 class ZarvaApp extends StatelessWidget {
@@ -40,6 +47,9 @@ class ZarvaApp extends StatelessWidget {
             theme: themeService.getLightTheme(),
             darkTheme: themeService.getDarkTheme(),
             themeMode: themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            useInheritedMediaQuery: true,
+            locale: DevicePreview.locale(context),
+            builder: DevicePreview.appBuilder,
 
             // 👇 App starts from Splash Screen
             initialRoute: '/',

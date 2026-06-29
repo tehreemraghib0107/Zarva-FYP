@@ -6,6 +6,7 @@ const ProductSchema = new mongoose.Schema({
     price: { type: String, required: true },
     image: { type: String, required: true }, // path like 'assets/1R.png'
     description: { type: String, default: '' },
+    productCode: { type: String, default: '' }, // e.g., '8N', '9N', '4L' for AR matching
     createdAt: { type: Date, default: Date.now }
 });
 

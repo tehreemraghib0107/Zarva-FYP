@@ -15,6 +15,10 @@ const mobileAppPath = path.join(__dirname, '..', 'mobile_app');
 app.use('/assets', express.static(path.join(mobileAppPath, 'assets')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Serve AR cropped assets from ar_services/AR
+const arPath = path.join(__dirname, '..', 'ar_services', 'AR');
+app.use('/ar', express.static(arPath));
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/favorites', require('./routes/favorites'));

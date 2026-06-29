@@ -6,12 +6,14 @@ class ArTryOnScreen extends StatelessWidget {
   final String productCategory;
   final String productImageUrl;
   final String? productName;
+  final String? productCode;
 
   const ArTryOnScreen({
     super.key,
     required this.productCategory,
     required this.productImageUrl,
     this.productName,
+    this.productCode,
   });
 
   @override
@@ -20,6 +22,7 @@ class ArTryOnScreen extends StatelessWidget {
       productCategory: productCategory,
       productImageUrl: productImageUrl,
       productName: productName,
+      productCode: productCode,
     );
   }
 }

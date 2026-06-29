@@ -13,14 +13,12 @@ Stages:
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import logging
 import os
 import random
 import sys
 import uuid
-import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 from io import BytesIO
@@ -205,10 +203,36 @@ def _is_gold_accent_rgb(rgb: Tuple[int, int, int]) -> bool:
     return r > 150 and g > 110 and b < 120 and (r - b) > 40
 
 
+def _is_skin_tone_bgr(bgr: Tuple[int, int, int]) -> bool:
+    """
+    Return True when a BGR pixel falls inside human skin / lip colour ranges
+    in both HSV and YCrCb colour spaces.  Used to strip flesh-tone clusters
+    (body, neck, face edges) from the K-Means garment-colour pool.
+    """
+    b, g, r = bgr
+    # --- HSV gate (OpenCV uses H∈[0,179], S,V∈[0,255]) ---
+    hsv = cv2.cvtColor(np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2HSV)[0, 0]
+    h, s, v = int(hsv[0]), int(hsv[1]), int(hsv[2])
+    hsv_skin = (0 <= h <= 25) and (s >= 30) and (v >= 60)
+
+    # --- YCrCb gate ---
+    ycrcb = cv2.cvtColor(np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2YCrCb)[0, 0]
+    cr, cb = int(ycrcb[1]), int(ycrcb[2])
+    ycrcb_skin = (133 <= cr <= 173) and (77 <= cb <= 127)
+
+    return hsv_skin and ycrcb_skin
+
+
 def extract_dress_color_profile(bgr: np.ndarray) -> Tuple[str, bool, str]:
     """
     K-Means on YOLO neck crop — returns (palette_name, has_warm_accents, display_label).
-    Handles teal/navy bases with gold block-print accents.
+
+    Optimised for heavily embroidered South Asian bridal garments:
+      • 5 clusters isolate metallic / embroidery sparkle into their own centroids.
+      • Skin-tone clusters (body, neck, face edges) are dropped before selection.
+      • The background fabric is chosen by lowest spatial variance (most spatially
+        continuous cluster), not by raw pixel count, so dense surface embroidery
+        cannot hijack the dominant-colour result.
     """
     if bgr is None or bgr.size == 0:
         return "Gold", True, "Gold"
@@ -216,7 +240,9 @@ def extract_dress_color_profile(bgr: np.ndarray) -> Tuple[str, bool, str]:
     pixels = small.reshape(-1, 3).astype(np.float32)
     if len(pixels) < 4:
         return "Gold", True, "Gold"
-    k = 4
+
+    # ── 1. INCREASE CLUSTER RESOLUTION: 5 clusters ────────────────────────
+    k = 5
     _compactness, labels, centers = cv2.kmeans(
         pixels,
         k,
@@ -225,20 +251,77 @@ def extract_dress_color_profile(bgr: np.ndarray) -> Tuple[str, bool, str]:
         8,
         cv2.KMEANS_PP_CENTERS,
     )
-    counts = np.bincount(labels.flatten(), minlength=k)
-    ranked = sorted(range(k), key=lambda i: counts[i], reverse=True)
+    labels_flat = labels.flatten()
 
-    cluster_names: List[str] = []
-    cluster_rgbs: List[Tuple[int, int, int]] = []
-    for idx in ranked:
-        bgr_c = centers[idx]
+    # ── 2. ANTI-SKIN MASK: drop any centroid that matches skin / lip tones ─
+    valid_indices: List[int] = []
+    valid_rgbs: List[Tuple[int, int, int]] = []
+    for i in range(k):
+        bgr_c = centers[i]
         rgb = (int(bgr_c[2]), int(bgr_c[1]), int(bgr_c[0]))
-        cluster_rgbs.append(rgb)
-        cluster_names.append(_rgb_to_palette_name(rgb))
+        if not _is_skin_tone_bgr((int(bgr_c[0]), int(bgr_c[1]), int(bgr_c[2]))):
+            valid_indices.append(i)
+            valid_rgbs.append(rgb)
 
-    dominant = cluster_names[0]
-    has_gold_accent = any(_is_gold_accent_rgb(rgb) for rgb in cluster_rgbs[1:])
-    has_warm_accent = has_gold_accent or any(n in WARM_DRESS_COLORS for n in cluster_names[1:])
+    # Fallback: if every cluster was flagged as skin (rare edge-case), accept all
+    if not valid_indices:
+        valid_indices = list(range(k))
+        valid_rgbs = [
+            (int(centers[i][2]), int(centers[i][1]), int(centers[i][0]))
+            for i in range(k)
+        ]
+
+    # ── 3. DOMINANT BACKGROUND FABRIC via spatial variance ─────────────────
+    # Build a 2-D coordinate grid matching the 128×128 resized image.
+    h, w = small.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w]                       # shape (h, w)
+    pixel_coords = np.stack([xx.ravel(), yy.ravel()], axis=1)  # (N, 2)
+
+    # For each surviving cluster compute the sum of x- and y-variance.
+    # Low variance  → pixels form a compact, spatially continuous region
+    #                 (i.e. the uninterrupted background fabric matrix).
+    # High variance → pixels are scattered across the image (dense
+    #                 embroidery sparkles, metallic reflections, etc.).
+    spatial_variances: List[float] = []
+    for idx in valid_indices:
+        mask = labels_flat == idx
+        if mask.sum() < 2:
+            spatial_variances.append(float("inf"))
+        else:
+            coords = pixel_coords[mask]
+            spatial_variances.append(float(np.var(coords, axis=0).sum()))
+
+    # Pick the valid cluster with the *lowest* spatial variance
+    best_valid_pos = int(np.argmin(spatial_variances))
+    best_idx = valid_indices[best_valid_pos]
+    dominant_rgb = valid_rgbs[best_valid_pos]
+    dominant = _rgb_to_palette_name(dominant_rgb)
+
+    # ── 4. HSV BOUNDARY GATES: override Euclidean anchor matching ───────────
+    # Convert the dominant background cluster centroid to HSV to apply
+    # saturation/value-based classification rules that prevent embroidery
+    # threads and lighting artifacts from hijacking the base textile color.
+    hsv = cv2.cvtColor(np.uint8([[[dominant_rgb[2], dominant_rgb[1], dominant_rgb[0]]]]), cv2.COLOR_BGR2HSV)[0, 0]
+    h_val, s_val, v_val = int(hsv[0]), int(hsv[1]), int(hsv[2])
+
+    # Gate A: High saturation (S > 110) with blue-green hue profile
+    # Prevents golden/bronze embroidery threads from being classified as warm neutrals.
+    # OpenCV H range: Green ≈ 60-90, Teal ≈ 85-100, Blue-green overlap ≈ 80-110.
+    if s_val > 110 and 60 <= h_val <= 110:
+        # Distinguish Teal (higher hue, bluer) from Green (lower hue, yellower green)
+        dominant = "Teal" if h_val >= 85 else "Green"
+
+    # Gate B: Low saturation (S < 45) with intermediate-to-high value (V > 95)
+    # Prevents amber shadows or dim indoor lighting from misclassifying neutral
+    # beige/tan outfits as 'Maroon'. Route directly to Ivory (warm neutral light).
+    elif s_val < 45 and v_val > 95:
+        dominant = "Ivory"
+
+    # Accent detection: check every *other* valid cluster for warm / gold tones
+    accent_rgbs = [rgb for j, rgb in enumerate(valid_rgbs) if valid_indices[j] != best_idx]
+    has_gold_accent = any(_is_gold_accent_rgb(rgb) for rgb in accent_rgbs)
+    accent_names = [_rgb_to_palette_name(rgb) for rgb in accent_rgbs]
+    has_warm_accent = has_gold_accent or any(n in WARM_DRESS_COLORS for n in accent_names)
 
     if dominant in ("Teal", "Blue", "Green") and has_gold_accent:
         display = f"{dominant} with Gold"
@@ -347,10 +430,26 @@ def build_tri_factor_recommendation(
 
     styling_insight = (
         f"For your {color_phrase} on {tone_phrase} with a {neckline_tag} neckline, "
-        f"we recommend {jewelry_type} in our {heritage_style}. {why_this_works}"
+        f"we recommend {jewelry_type} in our {heritage_style}."
     )
     if user_query.strip():
         styling_insight += f" You asked: \"{user_query.strip()}\" — this pairing respects that brief."
+
+    if neckline_tag in CHOKER_NECKLINES:
+        why_this_works = (
+            "This pairing establishes geometric equilibrium — horizontal necklines present an open area "
+            "that a close-fitting choker fills beautifully, drawing focus upward toward the face."
+        )
+    elif neckline_tag in PENDANT_NECKLINES:
+        why_this_works = (
+            "This pairing establishes linear harmony — plunging vertical silhouettes are complemented perfectly "
+            "by the dangling weight of a pendant, elongating the upper frame elegantly."
+        )
+    else:
+        why_this_works = (
+            "This pairing prevents visual overcrowding — structured collars and busy asymmetric layers look most elegant "
+            "when neck chains are completely omitted in favor of dominant, face-framing earrings."
+        )
 
     return {
         "neckline_tag": neckline_tag,
@@ -358,8 +457,11 @@ def build_tri_factor_recommendation(
         "metal_type": metal_type,
         "heritage_style": heritage_style,
         "styling_insight": styling_insight,
-        "why_this_works": why_this_works,
         "reply": styling_insight,
+        "recommendation": styling_insight,
+        "text": styling_insight,
+        "whyThisWorks": why_this_works,
+        "why_this_works": why_this_works,
     }
 
 
@@ -376,102 +478,181 @@ def resolve_manual_neckline(manual: str) -> Optional[str]:
 
 
 def fashion_text_reply(user_query: str) -> Dict[str, str]:
-    """Lightweight text-only stylist replies when no outfit image is supplied."""
-    q = user_query.strip()
-    if not q:
+    """
+    Hardcoded Absolute Context Routing Engine for ZARVA Chatbot.
+    Uses substring evaluation gates to completely prevent text matching failures.
+    """
+    # Clean up input string fully against trailing layout spaces or punctuation
+    q = user_query.strip().lower().replace("?", "").replace(".", "").replace("!", "")
+    
+    # ── 1. GLOBAL GREETING GATE ─────────────────────────────────────────────
+    greeting_keywords = ["hi", "hello", "hey", "salam", "aoa", "assalam", "hi zarbot", "hello zarva"]
+    if any(g == q or q.startswith(g) for g in greeting_keywords) or q in ["hi", "hello", "hey"]:
+        msg = "Hi! Welcome to ZarBot. How can I help you today?"
         return {
-            "reply": (
-                "Welcome to ZarBot. Ask me about saree draping, lehenga jewelry pairing, "
-                "or attach an outfit photo for a full AI styling pass."
-            ),
-            "whyThisWorks": "Open prompts help us guide you toward the right styling pathway.",
-            "styling_insight": "Welcome to ZarBot. Ask me about saree draping or jewelry pairing.",
-            "why_this_works": "Open prompts help us guide you toward the right styling pathway.",
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": msg,
+            "whyThisWorks": "",
+            "why_this_works": "",
+            "neckline_tag": "",
+            "jewelry_tag": ""
+        }
+
+    # ── 2. EXPLICIT VISION FUNNEL GATES (Forces image upload for Pakistani events) ──
+    vision_keywords = [
+        "want jewelry suggestion", "suggest jewelry", "wedding", "eid",
+        "pakistani wedding", "party", "function", "mehndi", "baraat", "walima",
+        "shadi", "festive", "occasion", "event", "ceremony", "dholki", "mayoun",
+        "nikah", "engagement", "aqeeqah", "milad", "dinner", "reception",
+        "heavy look", "bridals", "cousin shadi", "brother shadi", "sister shadi",
+        "what should i wear"
+    ]
+    if any(w in q for w in vision_keywords):
+        msg = "Okay! I will gladly suggest the perfect jewelry for your festive event. Please upload a clear image of your dress or outfit so I can mathematically analyze its neckline geometry, color space profiles, and skin tone variations to give you a highly customized, heavy jewelry recommendation from our collection!"
+        return {
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": "Vision funnel activated — awaiting outfit image for full tri-factor fusion analysis.",
+            "whyThisWorks": "",
+            "why_this_works": "",
             "neckline_tag": "",
             "jewelry_tag": "",
         }
 
-    resolved_neckline = resolve_manual_neckline(q)
-    if resolved_neckline is not None:
-        fused = build_tri_factor_recommendation(
-            neckline=resolved_neckline,
-            dress_color="Gold",
-            skin_tone="Neutral",
-        )
+    # ── 3. NATIVE PAKISTANI CUSTOMER SHOPPING QUERIES ───────────────────────
+    if any(w in q for w in ["casual lawn", "simple suite", "cotton kurti", "eid lawn", "printed suite"]):
+        msg = "For printed South Asian lawn suits or light Eid cotton kurtis, adding a heavy bridal choker creates a severe clash in fabric weight. We highly recommend matching these casual silhouettes with bold statement earrings alone to frame the face beautifully while keeping the neckline completely clean. Upload your suit photo to check its color profile!"
         return {
-            "reply": fused["reply"],
-            "stylingInsight": fused["styling_insight"],
-            "styling_insight": fused["styling_insight"],
-            "whyThisWorks": fused["why_this_works"],
-            "why_this_works": fused["why_this_works"],
-            "neckline_tag": fused["neckline_tag"],
-            "jewelry_tag": fused["jewelry_tag"],
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": "Light casual fabrics demand earring-only focus to preserve visual balance.",
+            "whyThisWorks": "This pairing prevents visual overcrowding — structured collars and busy asymmetric layers look most elegant when neck chains are completely omitted in favor of dominant, face-framing earrings.",
+            "why_this_works": "This pairing prevents visual overcrowding — structured collars and busy asymmetric layers look most elegant when neck chains are completely omitted in favor of dominant, face-framing earrings.",
+            "neckline_tag": "",
+            "jewelry_tag": "Statement Earrings Only",
         }
 
-    q_lower = q.lower()
+    if any(w in q for w in ["kaam hua wa hai", "heavy embroidery", "zardozi", "tilla work", "dabka", "gotta kinari"]):
+        msg = "Rich subcontinental tilla, dabka, and zardozi mirror embroidery heavily crowds the throat region. Adding a dense necklace introduces unnecessary visual clutter. We recommend dropping the necklace entirely and scaling up your face-framing earrings into bold Mughal or Pashtun traditional statements. Upload a photo of the chest embroidery so our K-Means matrix can find the base fabric tone!"
+        return {
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": "Dense mirror-work embroidery mandates earring-only styling to avoid visual friction.",
+            "whyThisWorks": "This pairing prevents visual overcrowding — structured collars and busy asymmetric layers look most elegant when neck chains are completely omitted in favor of dominant, face-framing earrings.",
+            "why_this_works": "This pairing prevents visual overcrowding — structured collars and busy asymmetric layers look most elegant when neck chains are completely omitted in favor of dominant, face-framing earrings.",
+            "neckline_tag": "",
+            "jewelry_tag": "Statement Earrings Only",
+        }
+
+    if any(w in q for w in ["dupatta setting", "heavy dupatta", "dupatta on head", "bridal drape"]):
+        msg = "When setting a heavy embroidered dupatta over your head or draped across one shoulder, your upper chest layout changes visually. A high-sitting Mughal Antique Gold Choker balances the scale of a heavy bridal drape perfectly without getting caught in the fabric folds. To ensure your neckline width supports a choker framework, please upload your draped outfit photo!"
+        return {
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": "Heavy draped dupattas require a high-sitting choker to maintain proportional balance.",
+            "whyThisWorks": "This pairing establishes geometric equilibrium — horizontal necklines present an open area that a close-fitting choker fills beautifully, drawing focus upward toward the face.",
+            "why_this_works": "This pairing establishes geometric equilibrium — horizontal necklines present an open area that a close-fitting choker fills beautifully, drawing focus upward toward the face.",
+            "neckline_tag": "Round and Scoop Neck",
+            "jewelry_tag": "Antique Gold Choker Necklace",
+        }
+
+    # ── 4. INTERNATIONAL & REGIONAL CULTURE GATES ───────────────────────────
+    if any(w in q for w in ["western", "gown", "maxi", "cocktail dress", "gala", "prom", "skirt", "frock"]):
+        msg = "For Western evening gowns and open-neck gala maxis, a sleek, structured choker layout acts as a stunning fusion centerpiece. Since our collection features rich, high-density traditional craftsmanship, pairing it with an open-shoulder Western cut creates a striking modern-ethnic look. Upload your dress photo to lock down the layout!"
+        return {
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": "Fusion Western silhouettes pair best with structured chokers for contrast.",
+            "whyThisWorks": "This pairing establishes geometric equilibrium — horizontal necklines present an open area that a close-fitting choker fills beautifully, drawing focus upward toward the face.",
+            "why_this_works": "This pairing establishes geometric equilibrium — horizontal necklines present an open area that a close-fitting choker fills beautifully, drawing focus upward toward the face.",
+            "neckline_tag": "Square Neck",
+            "jewelry_tag": "Mughal Antique Gold Choker",
+        }
+
+    if any(w in q for w in ["abaya", "kaftan", "caftan", "dubai style", "middle eastern", "hijab"]):
+        if any(kw in q for kw in ["abaya and hijab", "only my hands are visible", "hijab and abaya", "hands visible", "suggest a bracelet"]):
+            msg = "When wearing a traditional full-coverage Hijab and Abaya where only your hands are visible, necklaces and earrings are naturally occluded by the fabric drape. Therefore, the wrist becomes the singular, high-impact focal point for jewelry styling. We highly recommend pairing your outfit with a structured, high-density Arabian Metallic Statement Bracelet or stacked cuffs from our collection to elegantly frame the hand. Please upload a photo of your Abaya sleeve area so we can analyze the base fabric color!"
+            return {
+                "reply": msg,
+                "recommendation": msg,
+                "text": msg,
+                "styling_insight": "For full-coverage modest silhouettes, focus all styling scale on heavy wrist bracelets and stacked cuffs to maximize visibility.",
+                "whyThisWorks": "Wrist frames remain uninterrupted when high textile drapes occlude upper facial parameters.",
+                "why_this_works": "Wrist frames remain uninterrupted when high textile drapes occlude upper facial parameters.",
+                "neckline_tag": "Collar Ban",
+                "jewelry_tag": "Arabian Metallic Statement Bracelet / Cuff",
+            }
+        msg = "Middle Eastern flowing kaftans and formal high-neck abayas look spectacular when balanced with prominent face-framing earrings or structural wrist-wear like metallic statement cuffs instead of throat chains. Let our vision engine compute the fabric matrix—upload your portrait now!"
+        return {
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": "High-coverage Middle Eastern silhouettes redirect focal weight to earrings and wrist cuffs.",
+            "whyThisWorks": "This pairing prevents visual overcrowding — structured collars look most elegant when neck chains are completely omitted in favor of dominant wrist layouts.",
+            "why_this_works": "This pairing prevents visual overcrowding — structured collars look most elegant when neck chains are completely omitted in favor of dominant wrist layouts.",
+            "neckline_tag": "Collar Ban",
+            "jewelry_tag": "Statement Earrings Only",
+        }
+
+    if any(w in q for w in ["kashmiri", "pashmina", "phiran", "velvet kurti", "filigree"]):
+        msg = "Traditional high-neck Kashmiri phirans and rich winter velvet kurtis carry beautiful neckline embroidery layouts. Adding a necklace disrupts this craftsmanship. We recommend focusing purely on delicate Kashmiri filigree jhumkas to balance the silhouette. Upload your image to begin!"
+        return {
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": "Kashmiri neckline embroidery demands earring-only focus to preserve artisanal integrity.",
+            "whyThisWorks": "This pairing prevents visual overcrowding — structured collars look most elegant when neck chains are completely omitted in favor of dominant, face-framing earrings.",
+            "why_this_works": "This pairing prevents visual overcrowding — structured collars look most elegant when neck chains are completely omitted in favor of dominant, face-framing earrings.",
+            "neckline_tag": "Simple Collar",
+            "jewelry_tag": "Kashmiri Delicate Silver Filigree Jhumkas",
+        }
+
+    if any(w in q for w in ["pashtun", "afghan", "frock suit", "tribal", "kuchi"]):
+        msg = "Vibrant Pashtun tribal frocks and mirror-work borders pair naturally with oxidized antique metals or gemstone settings. Please upload your dress image so our background K-Means analyzer can cleanly separate your continuous fabric color blocks from your intricate multi-tone tribal thread borders!"
+        return {
+            "reply": msg,
+            "recommendation": msg,
+            "text": msg,
+            "styling_insight": "Pashtun tribal textiles require K-Means color de-noising before choker vs. earring routing.",
+            "whyThisWorks": "This pairing establishes geometric equilibrium — open layouts present an area that a tribal choker fills beautifully, drawing focus upward toward the face.",
+            "why_this_works": "This pairing establishes geometric equilibrium — open layouts present an area that a tribal choker fills beautifully, drawing focus upward toward the face.",
+            "neckline_tag": "Round and Scoop Neck",
+            "jewelry_tag": "Pashtun Oxidized Tribal Gemstone Choker",
+        }
+
+    # ── 5. PRESERVE EXISTING NECKLINE-CLASS KEYWORD FALLBACK ─────────────────
     for label in NECKLINE_CLASSES:
-        if label.lower() in q_lower:
-            fused = build_tri_factor_recommendation(
-                neckline=label,
-                dress_color="Gold",
-                skin_tone="Neutral",
-            )
+        if label.lower() in q:
+            fused = build_tri_factor_recommendation(neckline=label, dress_color="Gold", skin_tone="Neutral")
             return {
                 "reply": fused["reply"],
-                "stylingInsight": fused["styling_insight"],
+                "recommendation": fused["recommendation"],
+                "text": fused["text"],
                 "styling_insight": fused["styling_insight"],
-                "whyThisWorks": fused["why_this_works"],
-                "why_this_works": fused["why_this_works"],
+                "whyThisWorks": "Dynamic geometric baseline matrix applied.",
+                "why_this_works": "Dynamic geometric baseline matrix applied.",
                 "neckline_tag": fused["neckline_tag"],
                 "jewelry_tag": fused["jewelry_tag"],
             }
 
-    if any(w in q_lower for w in ("saree", "sari")):
-        return {
-            "reply": (
-                "For sarees, balance the drape with a necklace that follows your blouse neckline — "
-                "V and sweetheart necks love layered temple chains; boat necks suit collar-grazing strands."
-            ),
-            "whyThisWorks": "Vertical lines on the torso stay uninterrupted when jewelry echoes the neckline geometry.",
-            "styling_insight": "Match metal tone to embroidery and let the neckline guide the silhouette.",
-            "why_this_works": "Vertical lines on the torso stay uninterrupted when jewelry echoes the neckline geometry.",
-            "neckline_tag": "",
-            "jewelry_tag": "",
-        }
-    if any(w in q_lower for w in ("lehenga", "bridal", "wedding")):
-        return {
-            "reply": (
-                "Bridal lehengas shine with regional statement pieces: Mughal kundan chokers, "
-                "Pashtun jhumkas, or Kashmiri delicate filigree depending on your embroidery palette."
-            ),
-            "whyThisWorks": "Heavy skirt volume is balanced by focal jewelry near the face and neckline.",
-            "styling_insight": "Bridal volumes work best with a single strong focal piece at the face or neckline.",
-            "why_this_works": "Heavy skirt volume is balanced by focal jewelry near the face and neckline.",
-            "neckline_tag": "",
-            "jewelry_tag": "",
-        }
-    if any(w in q_lower for w in ("kurta", "kurti", "salwar")):
-        return {
-            "reply": (
-                "Kurtas with collar or band necklines photograph best with earrings alone; "
-                "add a delicate necklace only if the neckline drops below the collar bone."
-            ),
-            "whyThisWorks": "High necklines avoid visual clutter — earrings draw the eye without competing lines.",
-            "styling_insight": "Keep the neck clean on collar styles and use earrings to frame the face.",
-            "why_this_works": "High necklines avoid visual clutter — earrings draw the eye without competing lines.",
-            "neckline_tag": "",
-            "jewelry_tag": "Statement Earrings Only",
-        }
+    # ── 6. GLOBAL FALLBACK GATE ──────────────────────────────────────────────
+    msg = "I can craft a highly precise, multi-factor jewelry recommendation for you. Please attach an outfit photo, or specify your style parameters (e.g., Western gown, Pakistani wedding, Abaya drape, Kashmiri Phiran) so I can guide your styling profile!"
     return {
-        "reply": (
-            "I can craft a full jewelry recommendation when you attach an outfit photo. "
-            "Until then: match metal tone to embroidery, and let one statement piece anchor the look."
-        ),
-        "whyThisWorks": "A single focal accessory prevents competing highlights on richly embellished South Asian textiles.",
+        "reply": msg,
+        "recommendation": msg,
+        "text": msg,
         "styling_insight": "Until an outfit image is supplied, choose one strong piece and avoid competing accents.",
-        "why_this_works": "A single focal accessory prevents competing highlights on richly embellished South Asian textiles.",
+        "whyThisWorks": "This pairing follows ZARVA styling parameters — input custom text identifiers or supply an image canvas above.",
+        "why_this_works": "This pairing follows ZARVA styling parameters — input custom text identifiers or supply an image canvas above.",
         "neckline_tag": "",
-        "jewelry_tag": "",
+        "jewelry_tag": ""
     }
 
 
@@ -1418,7 +1599,6 @@ class ZarvaRecommendationEngine:
             skin_tone_auto_detected=skin_tone_auto_detected,
         )
         recommended_piece = fused["jewelry_tag"]
-        why_this_works = fused["why_this_works"]
         styling_insight = fused["styling_insight"]
         accent_label = (
             "Earrings" if "Earrings Only" in recommended_piece else "Necklace"
@@ -1440,9 +1620,11 @@ class ZarvaRecommendationEngine:
             "skinTone": skin_tone,
             "stylingInsight": styling_insight,
             "styling_insight": styling_insight,
-            "whyThisWorks": why_this_works,
-            "why_this_works": why_this_works,
+            "whyThisWorks": fused["whyThisWorks"],
+            "why_this_works": fused["why_this_works"],
             "recommendation": styling_insight,
+            "text": styling_insight,
+            "reply": styling_insight,
             "colorAutoDetected": color_auto_detected,
             "skinToneAutoDetected": skin_tone_auto_detected,
         }
@@ -1562,119 +1744,6 @@ def save_chat_to_db(
 
 
 # ---------------------------------------------------------------------------
-# AR Try-On — YOLO jewelry extraction + transparent PNG for web overlay
-# ---------------------------------------------------------------------------
-
-
-def _category_yolo_classes(category: str) -> List[str]:
-    cat = (category or "").lower()
-    if "earring" in cat:
-        return ["earring"]
-    if "choker" in cat:
-        return ["choker", "necklace", "pendant"]
-    if "locket" in cat:
-        return ["locket", "pendant", "necklace"]
-    return ["necklace", "pendant", "choker"]
-
-
-def _yolo_crop_for_category(
-    bgr: np.ndarray, yolo_model: YOLO, category: str
-) -> Tuple[np.ndarray, str]:
-    """Detect and crop jewelry matching the product category."""
-    classes = _category_yolo_classes(category)
-    yolo_model.set_classes(classes)
-    crop, item_type = _yolo_best_crop(bgr, yolo_model)
-    if crop is None:
-        h, w = bgr.shape[:2]
-        cat = (category or "").lower()
-        if "earring" in cat:
-            side = int(min(w, h) * 0.55)
-            sx = (w - side) // 2
-            sy = (h - side) // 2
-            crop = bgr[sy : sy + side, sx : sx + side]
-            item_type = "earring"
-        else:
-            sy = int(h * 0.15)
-            crop = bgr[sy:, :]
-            item_type = "necklace"
-    return crop, item_type
-
-
-def _trim_transparent_rgba(rgba: np.ndarray) -> np.ndarray:
-    alpha = rgba[:, :, 3]
-    coords = cv2.findNonZero(alpha)
-    if coords is None:
-        return rgba
-    x, y, w, h = cv2.boundingRect(coords)
-    return rgba[y : y + h, x : x + w]
-
-
-def remove_jewelry_background(bgr: np.ndarray) -> np.ndarray:
-    """Extract foreground jewelry with alpha channel (GrabCut + luminance mask)."""
-    if bgr is None or bgr.size == 0:
-        return np.zeros((64, 64, 4), dtype=np.uint8)
-
-    h, w = bgr.shape[:2]
-    rgba = cv2.cvtColor(bgr, cv2.COLOR_BGR2BGRA)
-
-    mask = np.zeros((h, w), np.uint8)
-    bgd_model = np.zeros((1, 65), np.float64)
-    fgd_model = np.zeros((1, 65), np.float64)
-    margin = max(4, min(h, w) // 16)
-    rect = (margin, margin, max(1, w - 2 * margin), max(1, h - 2 * margin))
-    try:
-        cv2.grabCut(bgr, mask, rect, bgd_model, fgd_model, 4, cv2.GC_INIT_WITH_RECT)
-        fg_mask = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
-    except cv2.error:
-        fg_mask = np.full((h, w), 255, dtype=np.uint8)
-
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    _, light_mask = cv2.threshold(gray, 235, 255, cv2.THRESH_BINARY)
-    light_mask = cv2.GaussianBlur(light_mask, (5, 5), 0)
-    combined = cv2.bitwise_and(fg_mask, cv2.bitwise_not(light_mask))
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    combined = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, kernel, iterations=2)
-    combined = cv2.morphologyEx(combined, cv2.MORPH_OPEN, kernel, iterations=1)
-
-    rgba[:, :, 3] = combined
-    return _trim_transparent_rgba(rgba)
-
-
-def bgra_to_data_url(rgba: np.ndarray) -> str:
-    ok, buf = cv2.imencode(".png", rgba)
-    if not ok:
-        raise ValueError("Failed to encode jewelry PNG.")
-    encoded = base64.b64encode(buf.tobytes()).decode("ascii")
-    return f"data:image/png;base64,{encoded}"
-
-
-def fetch_image_bgr_from_url(url: str) -> np.ndarray:
-    with urllib.request.urlopen(url, timeout=30) as response:
-        raw = response.read()
-    arr = np.frombuffer(raw, dtype=np.uint8)
-    bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-    if bgr is None:
-        raise ValueError("Could not decode image from URL.")
-    return bgr
-
-
-def extract_jewelry_overlay(bgr: np.ndarray, category: str) -> Dict[str, Any]:
-    """YOLO crop → background removal → transparent PNG data URL for AR overlay."""
-    yolo = _init_yolo_world()
-    crop, item_type = _yolo_crop_for_category(bgr, yolo, category)
-    rgba = remove_jewelry_background(crop)
-    h, w = rgba.shape[:2]
-    return {
-        "overlayDataUrl": bgra_to_data_url(rgba),
-        "itemType": item_type,
-        "width": w,
-        "height": h,
-        "aspectRatio": round(w / max(h, 1), 4),
-    }
-
-
-# ---------------------------------------------------------------------------
 # STEP 5 — FastAPI production wrapper
 # ---------------------------------------------------------------------------
 
@@ -1750,71 +1819,6 @@ def create_app() -> "FastAPI":
             **payload,
         }
 
-    @app.post("/api/ai/extract-jewelry")
-    async def extract_jewelry(
-        category: str = Form(default="necklace"),
-        imageUrl: str = Form(default=""),
-        image: Optional[UploadFile] = File(default=None),
-    ) -> Dict[str, Any]:
-        """Extract isolated jewelry PNG (2D asset) for web AR try-on overlay."""
-        try:
-            from ar_processor import prepare_ar_asset
-            uploads_dir = AI_ROOT.parent / "backend" / "uploads"
-            os.makedirs(uploads_dir, exist_ok=True)
-
-            temp_filename = f"temp_extract_{uuid.uuid4()}"
-            temp_path = None
-
-            if image is not None:
-                _, ext = os.path.splitext(image.filename or ".png")
-                if not ext:
-                    ext = ".png"
-                temp_filename = f"{temp_filename}{ext}"
-                temp_path = os.path.join(uploads_dir, temp_filename)
-                
-                raw = await image.read()
-                with open(temp_path, "wb") as f:
-                    f.write(raw)
-            elif imageUrl.strip():
-                url = imageUrl.strip()
-                ext = ".png"
-                for possible_ext in (".png", ".jpg", ".jpeg", ".webp"):
-                    if possible_ext in url.lower():
-                        ext = possible_ext
-                        break
-                temp_filename = f"{temp_filename}{ext}"
-                temp_path = os.path.join(uploads_dir, temp_filename)
-
-                parsed_local = False
-                if "/uploads/" in url:
-                    local_filename = url.split("/uploads/")[-1]
-                    local_filename = local_filename.split("?")[0]
-                    local_path = os.path.join(uploads_dir, local_filename)
-                    if os.path.exists(local_path):
-                        temp_path = local_path
-                        parsed_local = True
-                
-                if not parsed_local:
-                    with urllib.request.urlopen(url, timeout=30) as response:
-                        raw = response.read()
-                    with open(temp_path, "wb") as f:
-                        f.write(raw)
-            else:
-                return {"success": False, "error": "imageUrl or image file is required."}
-
-            payload = prepare_ar_asset(temp_path, category)
-            
-            if temp_path and "temp_extract_" in os.path.basename(temp_path) and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except Exception as cleanup_err:
-                    logger.warning("Failed to remove temporary file %s: %s", temp_path, cleanup_err)
-
-            return payload
-        except Exception as exc:
-            logger.exception("Jewelry extraction failed")
-            return {"success": False, "error": str(exc)}
-
     @app.post("/api/chat/text")
     async def chat_text(
         userId: str = Form(default="guest"),
@@ -1832,13 +1836,15 @@ def create_app() -> "FastAPI":
             "userId": userId,
             "sessionId": str(uuid.uuid4()),
             "type": "text",
+            "reply": text_payload["reply"],
+            "recommendation": text_payload["recommendation"],
+            "text": text_payload["text"],
             "stylingInsight": text_payload["styling_insight"],
             "styling_insight": text_payload["styling_insight"],
-            "whyThisWorks": text_payload["why_this_works"],
+            "whyThisWorks": text_payload["whyThisWorks"],
             "why_this_works": text_payload["why_this_works"],
             "neckline_tag": text_payload["neckline_tag"],
             "jewelry_tag": text_payload["jewelry_tag"],
-            "recommendation": text_payload["reply"],
         }
 
     return app

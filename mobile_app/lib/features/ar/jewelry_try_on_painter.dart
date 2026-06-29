@@ -48,12 +48,6 @@ class JewelryTryOnPainter extends CustomPainter {
     final double offsetY = (size.height - (inputHeight * scale)) / 2;
 
     Offset mapPoint(math.Point<int> point) {
-      if (isRotated) {
-        return Offset(
-          size.width - (point.y * scale) - offsetX,
-          point.x * scale + offsetY,
-        );
-      }
       return Offset(
         size.width - (point.x * scale) - offsetX,
         point.y * scale + offsetY,
@@ -70,34 +64,54 @@ class JewelryTryOnPainter extends CustomPainter {
     final double faceWidth = _lastFaceWidth;
     final double faceHeight = faceWidth * (rawFaceHeight / rawFaceWidth);
 
-    final double faceCenterX = size.width -
-        ((face.boundingBox.left + face.boundingBox.width / 2) * scale) -
-        offsetX;
-    final double faceCenterY =
-        (face.boundingBox.top + face.boundingBox.height / 2) * scale + offsetY;
+    // Map face center correctly to handle sensor rotation
+    final double rawCenterX = face.boundingBox.left + face.boundingBox.width / 2;
+    final double rawCenterY = face.boundingBox.top + face.boundingBox.height / 2;
+    final Offset faceCenterMapped = mapPoint(math.Point(rawCenterX.toInt(), rawCenterY.toInt()));
+    final double faceCenterX = faceCenterMapped.dx;
+    final double faceCenterY = faceCenterMapped.dy;
 
     final String catLower = category.toLowerCase();
 
     final leftEarLandmark = face.landmarks[FaceLandmarkType.leftEar];
     final rightEarLandmark = face.landmarks[FaceLandmarkType.rightEar];
 
-    Offset leftEarRaw = leftEarLandmark != null
-        ? mapPoint(leftEarLandmark.position)
-        : Offset(faceCenterX - faceWidth * 0.45, faceCenterY + faceHeight * 0.05);
+    Offset leftEarRaw = Offset.zero;
+    Offset rightEarRaw = Offset.zero;
 
-    Offset rightEarRaw = rightEarLandmark != null
-        ? mapPoint(rightEarLandmark.position)
-        : Offset(faceCenterX + faceWidth * 0.45, faceCenterY + faceHeight * 0.05);
-
-    double earDistance = faceWidth * 0.9;
-    if (leftEarLandmark != null && rightEarLandmark != null) {
-      earDistance = (leftEarRaw - rightEarRaw).distance;
-    }
+    final faceContour = face.contours[FaceContourType.face];
 
     if (catLower.contains('earring')) {
-      final double lobeOffsetY = faceHeight * 0.06;
-      leftEarRaw += Offset(0, lobeOffsetY);
-      rightEarRaw += Offset(0, lobeOffsetY);
+      // Use ML Kit ear landmarks directly for accurate earlobe placement
+      if (leftEarLandmark != null && rightEarLandmark != null) {
+        leftEarRaw = mapPoint(leftEarLandmark.position);
+        rightEarRaw = mapPoint(rightEarLandmark.position);
+
+        // Offset slightly downward to place at earlobe (not at ear top)
+        final double lobeOffsetY = faceHeight * 0.08;
+        leftEarRaw += Offset(0, lobeOffsetY);
+        rightEarRaw += Offset(0, lobeOffsetY);
+      } else if (faceContour != null && faceContour.points.length >= 36) {
+        // Fallback: use face contour points to estimate ear positions
+        // Points 0-4 are roughly the right side of face (viewer's left)
+        // Points 31-35 are roughly the left side of face (viewer's right)
+        final ptRightEar = mapPoint(faceContour.points[2]); // Viewer's left cheek area
+        final ptLeftEar = mapPoint(faceContour.points[33]); // Viewer's right cheek area
+
+        final dirRight = ptRightEar - faceCenterMapped;
+        final dirLeft = ptLeftEar - faceCenterMapped;
+
+        // Offset outward from face center and downward for earlobe
+        final double outwardOffset = faceWidth * 0.18;
+        final double downwardOffset = faceHeight * 0.06;
+
+        rightEarRaw = ptRightEar + Offset(dirRight.dx.sign * outwardOffset, downwardOffset);
+        leftEarRaw = ptLeftEar + Offset(dirLeft.dx.sign * outwardOffset, downwardOffset);
+      } else {
+        // Final fallback: use bounding box-based estimation
+        leftEarRaw = Offset(faceCenterX - faceWidth * 0.42, faceCenterY + faceHeight * 0.08);
+        rightEarRaw = Offset(faceCenterX + faceWidth * 0.42, faceCenterY + faceHeight * 0.08);
+      }
 
       _lastLeftEar = _lastLeftEar == null
           ? leftEarRaw
@@ -107,7 +121,6 @@ class JewelryTryOnPainter extends CustomPainter {
           : Offset.lerp(_lastRightEar, rightEarRaw, 0.25);
 
       // Find Chin Tip (equivalent to Landmark 152) and Forehead Tip (equivalent to Landmark 10)
-      final faceContour = face.contours[FaceContourType.face];
       Offset chin;
       Offset forehead;
       if (faceContour != null && faceContour.points.isNotEmpty) {
@@ -137,7 +150,6 @@ class JewelryTryOnPainter extends CustomPainter {
       _drawEarring(canvas, _lastRightEar!, rollAngle, earringHeight, true);
     } else {
       // Find Chin Tip (equivalent to Landmark 152) using contour if available
-      final faceContour = face.contours[FaceContourType.face];
       Offset chin;
       Offset jawL;
       Offset jawR;

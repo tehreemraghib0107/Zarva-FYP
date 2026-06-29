@@ -830,30 +830,33 @@ class _ChatbotScreenState extends State<ChatbotScreen>
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 16),
-              const Row(
-                children: [
-                  Text('📐', style: TextStyle(fontSize: 16)),
-                  SizedBox(width: 6),
-                  Text(
-                    'Why This Works',
-                    style: TextStyle(
-                      color: _luxuryGold,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+              if (parsed.whyThisWorks.isNotEmpty &&
+                  !parsed.whyThisWorks.contains('ZARVA styling parameters')) ...[
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    Text('📐', style: TextStyle(fontSize: 16)),
+                    SizedBox(width: 6),
+                    Text(
+                      'Why This Works',
+                      style: TextStyle(
+                        color: _luxuryGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                parsed.whyThisWorks,
-                style: TextStyle(
-                  color: _creamText.withValues(alpha: 0.88),
-                  fontSize: 13,
-                  height: 1.45,
+                  ],
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  parsed.whyThisWorks,
+                  style: TextStyle(
+                    color: _creamText.withValues(alpha: 0.88),
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

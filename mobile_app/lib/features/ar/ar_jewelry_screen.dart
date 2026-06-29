@@ -7,19 +7,34 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../services/ar_jewelry_extractor_service.dart';
+import '../../constants.dart';
 import 'jewelry_try_on_painter.dart';
+
+const Set<String> _localArAssets = {
+  '10E.png', '10N.png', '1B.png', '1C.png', '1E.png', '1L.png', '1R.png',
+  '2B.png', '2C.png', '2E.png', '2L.png', '2N.png', '2R.png',
+  '3B.png', '3C.png', '3E.png', '3N.png', '3R.png',
+  '4C.png', '4E.png', '4L.png', '4N.png',
+  '5C.png', '5E.png',
+  '6C.png', '6E.png',
+  '7E.png', '7N.png',
+  '8E.png', '8N.png',
+  '9E.png', '9N.png'
+};
 
 /// Native mobile AR try-on — camera stream + ML Kit face landmarks + custom painter.
 class ARJewelryScreen extends StatefulWidget {
   final String productCategory;
   final String productImageUrl;
   final String? productName;
+  final String? productCode;
 
   const ARJewelryScreen({
     super.key,
     required this.productCategory,
     required this.productImageUrl,
     this.productName,
+    this.productCode,
   });
 
   @override
@@ -66,19 +81,93 @@ class _ARJewelryScreenState extends State<ARJewelryScreen> with WidgetsBindingOb
     setState(() => _isLoadingImage = true);
 
     try {
-      String? processedUrl;
+      String? filename;
       if (widget.productImageUrl.isNotEmpty) {
-        processedUrl = await ArJewelryExtractorService.extractOverlay(
-          widget.productImageUrl,
-          widget.productCategory,
-        );
+        filename = widget.productImageUrl.split('/').last.split('?').first;
       }
 
-      final pathOrUrl = processedUrl ?? (widget.productImageUrl.isNotEmpty
-          ? widget.productImageUrl
-          : (widget.productCategory.toLowerCase().contains('earring')
-              ? 'assets/1E.png'
-              : 'assets/2N.png'));
+      String? matchedLocalAsset;
+      
+      // Priority 1: Use productCode field if available (from admin panel)
+      if (widget.productCode != null && widget.productCode!.isNotEmpty) {
+        final code = widget.productCode!.toUpperCase().trim();
+        final assetFile = '$code.png';
+        if (_localArAssets.contains(assetFile)) {
+          matchedLocalAsset = assetFile;
+        }
+      }
+      
+      // Priority 2: Try to match from filename
+      if (matchedLocalAsset == null && filename != null) {
+        if (_localArAssets.contains(filename)) {
+          matchedLocalAsset = filename;
+        } else {
+          // Try to extract product code from filename (e.g., "8N" from "8N.png" or "8N")
+          final productCodeFromFile = filename.split('.').first;
+          final assetFile = '$productCodeFromFile.png';
+          if (_localArAssets.contains(assetFile)) {
+            matchedLocalAsset = assetFile;
+          } else {
+            // Try matching with regex
+            for (final localAsset in _localArAssets) {
+              final assetBase = localAsset.split('.').first;
+              final assetExt = localAsset.split('.').last;
+              final regex = RegExp(r'(^|[^a-zA-Z0-9])' + assetBase + r'([^a-zA-Z0-9]|\.|$)');
+              if (filename.contains(regex) && filename.endsWith('.$assetExt')) {
+                matchedLocalAsset = localAsset;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Priority 3: Try to extract product code from product name
+      String? matchedLocalAssetFromName;
+      if (matchedLocalAsset == null && widget.productName != null) {
+        final productName = widget.productName!.toUpperCase();
+        // Look for patterns like "8N", "9N", "4L", "10E", "2E", "10N" in the product name
+        final codeRegex = RegExp(r'\b(\d+[A-Z])\b');
+        final matches = codeRegex.allMatches(productName);
+        for (final match in matches) {
+          final code = match.group(1)!;
+          final assetFile = '$code.png';
+          if (_localArAssets.contains(assetFile)) {
+            matchedLocalAssetFromName = assetFile;
+            break;
+          }
+        }
+      }
+
+      String pathOrUrl;
+      if (matchedLocalAsset != null) {
+        // Fetch ALL matched AR products from backend /ar endpoint (ar_services/AR folder)
+        final baseUrl = AppConstants.baseUrl.replaceAll('/api', '');
+        pathOrUrl = '$baseUrl/ar/$matchedLocalAsset';
+      } else if (matchedLocalAssetFromName != null) {
+        // Fetch from backend /ar endpoint using product code extracted from name
+        final baseUrl = AppConstants.baseUrl.replaceAll('/api', '');
+        pathOrUrl = '$baseUrl/ar/$matchedLocalAssetFromName';
+      } else {
+        String? processedUrl;
+        if (widget.productImageUrl.isNotEmpty) {
+          processedUrl = await ArJewelryExtractorService.extractOverlay(
+            widget.productImageUrl,
+            widget.productCategory,
+          );
+        }
+
+        pathOrUrl = processedUrl ?? (widget.productImageUrl.isNotEmpty
+            ? widget.productImageUrl
+            : (widget.productCategory.toLowerCase().contains('earring')
+                ? 'assets/1E.png'
+                : 'assets/2N.png'));
+
+        if (pathOrUrl.startsWith('assets/') && !pathOrUrl.contains('assets/ar/')) {
+          final fname = pathOrUrl.split('/').last;
+          pathOrUrl = 'assets/ar/$fname';
+        }
+      }
 
       final decoded = await _loadImage(pathOrUrl);
       final bounds = await _findNonTransparentBounds(decoded);

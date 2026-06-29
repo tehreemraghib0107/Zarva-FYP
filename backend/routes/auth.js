@@ -133,6 +133,28 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
+// PUT /profile - Update user profile (name and profileImage)
+router.put('/profile', auth, async (req, res) => {
+  try {
+    const { name, profileImage } = req.body;
+    const userId = req.user.id;
+    
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (profileImage !== undefined) updateData.profileImage = profileImage;
+    
+    const user = await User.findByIdAndUpdate(userId, updateData, { new: true }).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET all users (Admin only)
 router.get('/users', async (req, res) => {
     try {

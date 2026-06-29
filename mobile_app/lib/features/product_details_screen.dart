@@ -340,24 +340,26 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Camera Icon
-                      GestureDetector(
-                        onTap: () {
-                          final productCategory = widget.product['category']?.toString() ?? 'Jewelry';
-                          final imageField = widget.product['imageUrl'] ?? widget.product['image'] ?? '';
-                          final productImageUrl = imageField.toString().startsWith('http')
-                              ? imageField.toString()
-                              : '${AppConstants.baseUrl.replaceAll('/api', '')}/${imageField.toString()}';
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ArTryOnScreen(
-                                productCategory: productCategory,
-                                productImageUrl: productImageUrl,
-                                productName: widget.product['name']?.toString(),
+                        GestureDetector(
+                          onTap: () {
+                            final productCategory = widget.product['category']?.toString() ?? 'Jewelry';
+                            final imageField = widget.product['imageUrl'] ?? widget.product['image'] ?? '';
+                            final productImageUrl = imageField.toString().startsWith('http')
+                                ? imageField.toString()
+                                : '${AppConstants.baseUrl.replaceAll('/api', '')}/${imageField.toString()}';
+                            final productCode = widget.product['productCode']?.toString();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ArTryOnScreen(
+                                  productCategory: productCategory,
+                                  productImageUrl: productImageUrl,
+                                  productName: widget.product['name']?.toString(),
+                                  productCode: productCode,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: const BoxDecoration(

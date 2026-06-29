@@ -66,21 +66,36 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Future<void> _saveProfile() async {
     setState(() => _isSaving = true);
-    final result = await _authService.updateProfile(
-      name: _nameController.text,
-      profileImage: _profileImageBase64,
-    );
-
-    if (mounted) {
-      setState(() {
-        _isSaving = false;
-        _isEditing = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['success'] ? 'Profile updated successfully' : 'Failed to update profile')),
+    
+    try {
+      final result = await _authService.updateProfile(
+        name: _nameController.text,
+        profileImage: _profileImageBase64,
       );
-      if (result['success']) {
-         _loadProfile(); // Refresh
+
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _isEditing = false;
+        });
+        
+        if (result['success']) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile updated successfully'), backgroundColor: Colors.green),
+          );
+          _loadProfile(); // Refresh
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result['message'] ?? 'Failed to update profile'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }

@@ -123,9 +123,8 @@ class ArWebBridge {
     var cat = (registry.productCategory||'').toLowerCase();
 
     if(cat.includes('earring')){
-      var dangle = faceHeight * 0.06 / mapVideoPoint(registry,0,0).scale;
-      var leftRaw = mapVideoPoint(registry, le.x*vw, le.y*vh + dangle);
-      var rightRaw = mapVideoPoint(registry, re.x*vw, re.y*vh + dangle);
+      var leftRaw = mapVideoPoint(registry, le.x*vw, le.y*vh);
+      var rightRaw = mapVideoPoint(registry, re.x*vw, re.y*vh);
       registry.smooth.leftEar = registry.smooth.leftEar
         ? lerpPt(registry.smooth.leftEar, leftRaw, 0.25) : leftRaw;
       registry.smooth.rightEar = registry.smooth.rightEar
@@ -137,10 +136,16 @@ class ArWebBridge {
       var headScale = Math.sqrt(Math.pow(chinMapped.x - foreheadMapped.x, 2) + Math.pow(chinMapped.y - foreheadMapped.y, 2));
       
       // Scale height of the earring directly proportional to headScale baseline
-      var earringHeight = headScale * 0.20;
+      var earringHeight = headScale * 0.35;
 
-      drawJewelry(ctx, registry.jewelryImage, registry.smooth.leftEar, earringHeight, roll, false, false);
-      drawJewelry(ctx, registry.jewelryImage, registry.smooth.rightEar, earringHeight, roll, false, true);
+      var cw = registry.container.clientWidth || 640;
+      var ch = registry.container.clientHeight || 480;
+      if(registry.smooth.leftEar && registry.smooth.leftEar.x > 0 && registry.smooth.leftEar.x < cw){
+        drawJewelry(ctx, registry.jewelryImage, registry.smooth.leftEar, earringHeight, roll, false, false);
+      }
+      if(registry.smooth.rightEar && registry.smooth.rightEar.x > 0 && registry.smooth.rightEar.x < cw){
+        drawJewelry(ctx, registry.jewelryImage, registry.smooth.rightEar, earringHeight, roll, false, false);
+      }
     } else {
       var chinMapped = mapVideoPoint(registry, chin.x*vw, chin.y*vh);
       var jawL = lm[JAW_LEFT], jawR = lm[JAW_RIGHT];
@@ -182,7 +187,7 @@ class ArWebBridge {
       var neckDy = shoulderCenter.y - chinMapped.y;
 
       // Tight static offset upward toward throat for chokers, lower on collarbone plane for necklaces
-      var tOffset = cat.includes('choker') ? 0.22 : 0.68;
+      var tOffset = cat.includes('choker') ? 0.22 : 0.25;
       var neckRaw = {
         x: chinMapped.x + tOffset * neckDx,
         y: chinMapped.y + tOffset * neckDy
@@ -192,30 +197,50 @@ class ArWebBridge {
         ? lerpPt(registry.smooth.neck, neckRaw, 0.25) : neckRaw;
       
       // Enforce necklace width to exactly 1.15x the neckWidth
-      var width = neckWidth * 1.15;
+      var width = cat.includes('choker') ? neckWidth * 0.95 : neckWidth * 1.10;
       drawJewelry(ctx, registry.jewelryImage, registry.smooth.neck, width, roll, true, false);
     }
   }
 
   function drawJewelry(ctx, img, pos, size, roll, isNecklace, isRight){
+    // Create offscreen canvas to remove white/pink background
+    var offscreen = document.createElement('canvas');
+    offscreen.width = img.width;
+    offscreen.height = img.height;
+    var offCtx = offscreen.getContext('2d');
+    offCtx.imageSmoothingEnabled = true;
+    offCtx.imageSmoothingQuality = 'high';
+    offCtx.drawImage(img, 0, 0);
+    var imageData = offCtx.getImageData(0, 0, img.width, img.height);
+    var data = imageData.data;
+    for(var i = 0; i < data.length; i += 4){
+      var r = data[i], g = data[i+1], b = data[i+2];
+      // Remove white and near-white and pink background pixels
+      if(r > 180 && g > 150 && b > 150){
+        data[i+3] = 0;
+      }
+    }
+    offCtx.putImageData(imageData, 0, 0);
+
     ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetX = 4;
+    ctx.shadowOffsetY = 4;
     ctx.translate(pos.x, pos.y);
     ctx.rotate(roll);
-    if (isRight) {
-      ctx.scale(-1, 1);
-    }
-    ctx.shadowColor = 'rgba(0,0,0,0.38)';
-    ctx.shadowBlur = 10;
-    
-    var w, h;
+    if(isRight){ ctx.scale(-1, 1); }
     if(isNecklace){
-      w = size;
-      h = w * (img.height / img.width);
-      ctx.drawImage(img, -w/2, -h*0.3, w, h);
+      // 3D perspective tilt for necklace
+      ctx.transform(1, 0.08, -0.08, 0.92, 0, 0);
+      var w = size;
+      var h = w * (img.height / img.width);
+      ctx.drawImage(offscreen, -w/2, -h*0.3, w, h);
     } else {
-      h = size; // earring height
-      w = h * (img.width / img.height);
-      ctx.drawImage(img, -w/2, 0, w, h);
+      var h = size; // earring height
+      var w = h * (img.width / img.height);
+      ctx.drawImage(offscreen, -w/2, 0, w, h);
     }
     ctx.restore();
   }
@@ -276,7 +301,17 @@ class ArWebBridge {
       container.appendChild(video);
       container.appendChild(overlayCanvas);
 
-      var jewelryImage = await loadImage(productImageUrl);
+      var parts = productImageUrl.split('/');
+      var filename = parts.pop();
+      parts.push('ar');
+      parts.push(filename);
+      var arUrl = parts.join('/');
+
+      var jewelryImage = await loadImage(arUrl);
+      if(!jewelryImage){
+        jewelryImage = await loadImage(productImageUrl);
+      }
+
       if(!jewelryImage){
         window.arTryOnErrors[containerId] = 'Could not load jewelry overlay image.';
         return;
@@ -294,7 +329,7 @@ class ArWebBridge {
         container: container,
         video: video,
         overlayCanvas: overlayCanvas,
-        overlayCtx: overlayCanvas.getContext('2d'),
+        overlayCtx: (function(){ var ctx = overlayCanvas.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; return ctx; })(),
         jewelryImage: jewelryImage,
         stream: stream,
         faceLandmarks: null,

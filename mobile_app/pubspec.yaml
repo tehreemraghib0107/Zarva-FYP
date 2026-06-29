@@ -3,7 +3,7 @@ description: "Zarva Mobile Application"
 publish_to: 'none'
 version: 1.0.0+1
 
-environment:
+environment: 
   sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
@@ -15,7 +15,7 @@ dependencies:
   http: ^1.1.0
   google_sign_in: ^6.1.0
   image_picker: ^1.0.7
-  intl: ^0.19.0
+  intl: ^0.20.2
   url_launcher: ^6.3.2
   uuid: ^4.3.3
   another_flushbar: ^1.12.30
@@ -24,12 +24,15 @@ dependencies:
   google_mlkit_face_detection: ^0.11.0
   google_mlkit_commons: ^0.7.1
   permission_handler: ^11.3.1
+  device_preview: ^1.2.0
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -62,6 +65,7 @@ flutter:
     - assets/4C.png
     - assets/4E.png
     - assets/4N.png
+    - assets/4L.png
     - assets/4R.png
     - assets/5B.png
     - assets/5C.png
@@ -73,8 +77,20 @@ flutter:
     - assets/7E.png
     - assets/7N.png
     - assets/8E.png
+    - assets/8N.png
+    - assets/9N.png
+    - assets/10E.png
+    - assets/10N.png
     - assets/Banner.png
     - assets/Banner2.png
     - assets/Banner3.png
     - assets/Banner4.png
     - assets/whatsapp.png
+    - assets/logo deploy.png
+    - assets/ar/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/logo deploy.png"
+  min_sdk_android: 21
